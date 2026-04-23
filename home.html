@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="stylesheet" href="CSS/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Maker</title>
+</head>
+
+<body>
+
+    <!-- TOOLBAR -->
+    <div id="toolbar">
+        <h1>⏱ Schedule Maker</h1>
+        <span class="tb-sep"></span>
+        <label>Day: <input type="number" id="day-input" value="3" min="1" max="99" oninput="setDay(this.value)"></label>
+        <span class="tb-sep"></span>
+        <button class="tb-btn green" onclick="openAddPersonModal(null)">+ Add Person</button>
+        <button class="tb-btn blue" onclick="openWBGTModal()">Edit WBGT</button>
+        <button class="tb-btn orange" onclick="openMetaModal()">Edit Notes</button>
+        <button class="tb-btn purple" onclick="openGeneratorModal()">⚡ Generate</button>
+        <button class="tb-btn grey" onclick="window.print()">🖨 Print</button>
+        <button class="tb-btn teal" onclick="exportData()">⬇ Export</button>
+        <label class="tb-btn teal" style="cursor:pointer">⬆ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+        <span class="tb-sep"></span>
+        <span style="font-size:10px;color:#aaa">Click timeline to add task · Click task to edit</span>
+    </div>
+
+    <!-- SCHEDULE -->
+    <div id="schedule-wrapper">
+        <table id="schedule-table">
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </div>
+    <div id="constraint-legend">
+        ✔ <b>3 hrs per shift</b> &nbsp;|&nbsp; ✔ <b>≥ 1 hr break after shift</b> &nbsp;|&nbsp;
+        <span class="warn">*</span> = Hours exceeded avg by &gt;3× &nbsp;|&nbsp;
+        <b>NMT</b>: No move time (24 hrs standby)
+    </div>
+
+    <!-- ── MODALS ── -->
+
+    <!-- Add/Edit Person Modal -->
+    <div class="modal-overlay" id="modal-person">
+        <div class="modal">
+            <h2 id="modal-person-title">Add Person</h2>
+            <label>Name</label>
+            <input type="text" id="p-name" placeholder="e.g. Adlan">
+            <label>Role / Code (optional)</label>
+            <input type="text" id="p-role" placeholder="e.g. C1">
+            <label>Group</label>
+            <select id="p-group">
+                <option value="kah">Key Appointment Holders (KAH)</option>
+                <option value="combatants">Combatants (Day)</option>
+                <option value="service">Service (Day)</option>
+                <option value="night">Night Duty</option>
+            </select>
+            <div class="modal-btns">
+                <button class="btn-danger" id="btn-delete-person" onclick="deletePerson()"
+                    style="display:none">Delete</button>
+                <button class="btn-cancel" onclick="closeModal('modal-person')">Cancel</button>
+                <button class="btn-primary" onclick="savePerson()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Task Modal -->
+    <div class="modal-overlay" id="modal-task">
+        <div class="modal">
+            <h2 id="modal-task-title">Add Task</h2>
+            <label>Task Type</label>
+            <select id="t-type" onchange="updateTaskColor()">
+                <option value="Sentry">Sentry</option>
+                <option value="PAC">PAC</option>
+                <option value="VAC">VAC</option>
+                <option value="ND">ND</option>
+                <option value="SIGC">SIGC</option>
+                <option value="GC/PO">GC/PO</option>
+                <option value="VAC/PAC">VAC/PAC till secured</option>
+                <option value="Custom">Custom…</option>
+            </select>
+            <div id="custom-label-wrap" style="display:none">
+                <label>Custom Label</label>
+                <input type="text" id="t-custom-label" placeholder="e.g. REST">
+            </div>
+            <div class="form-row">
+                <div>
+                    <label>Start Time (HHMM)</label>
+                    <input type="text" id="t-start" placeholder="e.g. 0700" maxlength="4">
+                </div>
+                <div>
+                    <label>End Time (HHMM)</label>
+                    <input type="text" id="t-end" placeholder="e.g. 0900" maxlength="4">
+                </div>
+            </div>
+            <label>Color <span id="color-preview"
+                    style="display:inline-block;width:14px;height:14px;border-radius:2px;border:1px solid #999;vertical-align:middle;margin-left:4px"></span></label>
+            <input type="color" id="t-color" value="#f44336">
+            <div class="modal-btns">
+                <button class="btn-danger" id="btn-delete-task" onclick="deleteTask()"
+                    style="display:none">Delete</button>
+                <button class="btn-cancel" onclick="closeModal('modal-task')">Cancel</button>
+                <button class="btn-primary" onclick="saveTask()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WBGT Modal -->
+    <div class="modal-overlay" id="modal-wbgt">
+        <div class="modal">
+            <h2>Edit WBGT Codes</h2>
+            <p style="font-size:10px;color:#666;margin-bottom:10px">Set WBGT condition for each time slot</p>
+            <div id="wbgt-fields"></div>
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="closeModal('modal-wbgt')">Cancel</button>
+                <button class="btn-primary" onclick="saveWBGT()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meta / Notes Modal -->
+    <div class="modal-overlay" id="modal-meta">
+        <div class="modal">
+            <h2>Edit Notes &amp; Info</h2>
+            <label>0600 Flag (comma-separated names)</label>
+            <input type="text" id="m-flag0600" placeholder="e.g. Adlan,Sahil,Danish">
+            <label>1800 Flag (comma-separated names)</label>
+            <input type="text" id="m-flag1800" placeholder="e.g. Haziq,ZZ,Aidan">
+            <label>Morning Prowl (comma-separated names)</label>
+            <input type="text" id="m-prowl" placeholder="e.g. Adlan,ZZ">
+            <label>Total Strength (KAH / Day / Night, e.g. 02/06/02)</label>
+            <input type="text" id="m-strength" placeholder="02 / 06 / 02">
+            <label>Service Avg Mounting hrs</label>
+            <input type="number" id="m-svc-avg" step="0.5" placeholder="4.5">
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="closeModal('modal-meta')">Cancel</button>
+                <button class="btn-primary" onclick="saveMeta()">Save</button>
+            </div>
+        </div>
+    </div>
+    <!-- Generator Modal -->
+    <div class="modal-overlay" id="modal-generator">
+        <div class="modal modal-wide">
+            <h2>⚡ Schedule Generator</h2>
+            <p class="gen-subtitle">Define what needs to be covered. The generator will distribute shifts across your personnel, respecting the 3hr max and 1hr break rules.</p>
+
+            <div class="gen-options">
+                <label class="gen-check">
+                    <input type="checkbox" id="gen-clear" checked>
+                    Clear existing tasks before generating
+                </label>
+                <label class="gen-check">
+                    <input type="checkbox" id="gen-rotate" checked>
+                    Rotate fairly (spread workload evenly)
+                </label>
+            </div>
+
+            <div class="gen-table-wrap">
+                <table class="gen-table" id="gen-req-table">
+                    <thead>
+                        <tr>
+                            <th>Task Type</th>
+                            <th>Coverage Start</th>
+                            <th>Coverage End</th>
+                            <th>Shift Length (hrs)</th>
+                            <th>Assigned Group</th>
+                            <th>Color</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="gen-req-body"></tbody>
+                </table>
+            </div>
+            <button class="add-person-btn" onclick="addGenRow()">+ Add Requirement</button>
+
+            <div id="gen-result" class="gen-result" style="display:none"></div>
+
+            <div class="modal-btns" style="margin-top:14px">
+                <button class="btn-cancel" onclick="closeModal('modal-generator')">Cancel</button>
+                <button class="btn-primary" style="background:#7b2ff7" onclick="runGenerator()">⚡ Generate Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drag time tooltip -->
+    <div id="drag-tooltip"></div>
+
+    <script src="JS/script.js"></script>
+</body>
+
+</html>
