@@ -35,13 +35,17 @@
         <button class="tb-btn grey tb-hamburger" onclick="toggleToolbarMenu()" aria-label="Menu">☰</button>
         <div id="tb-menu">
             <button class="tb-btn blue" onclick="openWBGTModal()">Edit WBGT</button>
-            <button class="tb-btn purple" onclick="openGeneratorModal()">⚡ Generate</button>
             <button class="tb-btn grey" onclick="window.print()">🖨 Print</button>
             <button class="tb-btn teal" onclick="shareAsLink(this)">🔗 Share Link</button>
             <button class="tb-btn indigo" onclick="captureScreenshot(this)">📸 Screenshot</button>
         </div>
         <span class="tb-sep tb-hint"></span>
-        <span class="tb-hint" style="font-size:10px;color:#aaa">Click timeline to add task · Click task to edit</span>
+        <div id="constraint-legend" class="tb-hint">
+            <span class="leg-badge leg-green">✔ 3 hrs / shift</span>
+            <span class="leg-badge leg-green">✔ ≥ 1 hr break</span>
+            <span class="leg-badge leg-blue">🔒 NMT: 24 hrs standby</span>
+            <span class="leg-badge leg-red"><span class="legend-warn-icon">⚠</span> Tap alert → ignore</span>
+        </div>
     </div>
     <div id="mobile-scroll-hint">&#8592; Swipe to view full schedule &nbsp;·&nbsp; Tap timeline to add task &#8594;</div>
 
@@ -52,12 +56,6 @@
                 <thead id="table-head"></thead>
                 <tbody id="table-body"></tbody>
             </table>
-        </div>
-        <div id="constraint-legend">
-            ✔ <b>3 hrs per shift</b> &nbsp;|&nbsp; ✔ <b>≥ 1 hr break after shift</b> &nbsp;|&nbsp;
-            <span class="warn">*</span> = Hours exceeded avg by &gt;3× &nbsp;|&nbsp;
-            <b>NMT</b>: No move time (24 hrs standby) &nbsp;|&nbsp;
-            <span class="legend-ignore-tip"><span class="legend-warn-icon">⚠</span> <b>Tap</b> the alert icon to ignore (manpower shortage)</span>
         </div>
     </div>
 
