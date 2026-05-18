@@ -496,8 +496,14 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
       badge.title = 'Click to ignore this alert';
       badge.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         openIgnoreModal(task.id, task.label || task.type);
       });
+      badge.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        openIgnoreModal(task.id, task.label || task.type);
+      }, { passive: false });
       bar.appendChild(badge);
     } else if (ignored && taskDurationHrs(task) > 3.0001) {
       // Show a muted "ignored" dot so user knows it was suppressed
