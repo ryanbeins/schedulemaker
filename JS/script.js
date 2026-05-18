@@ -486,6 +486,15 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     }, { passive: false });
     bar.appendChild(rh);
 
+    // Violation badge if task > 3 hrs
+    if (taskDurationHrs(task) > 3.0001) {
+      bar.classList.add('task-violation');
+      const badge = document.createElement('span');
+      badge.className = 'task-violation-badge';
+      badge.textContent = '!!!!';
+      bar.appendChild(badge);
+    }
+
     timeCell.appendChild(bar);
   });
 
@@ -495,10 +504,15 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     nameCell.classList.add('has-violation');
   }
 
-  const hrs      = totalHours(person);
-  const d2Cell   = row.insertCell();
-  d2Cell.className   = 'total-cell total-d2';
-  d2Cell.textContent = hrs > 0 ? hrs.toFixed(2) : '';
+  const hrs    = totalHours(person);
+  const d2Cell = row.insertCell();
+  d2Cell.className = 'total-cell total-d2';
+  if (issues.length > 0) {
+    d2Cell.classList.add('violation-cell');
+    d2Cell.innerHTML = `<span>${hrs > 0 ? hrs.toFixed(2) : '—'}</span><span class="violation-exclaim"> !!!!</span>`;
+  } else {
+    d2Cell.textContent = hrs > 0 ? hrs.toFixed(2) : '';
+  }
   if (hrs > avg * 3) {
     d2Cell.classList.add('over-avg');
     d2Cell.title = '* Hours exceeded avg by >3×';
