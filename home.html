@@ -2,10 +2,21 @@
 <html lang="en">
 
 <head>
-    <link rel="stylesheet" href="CSS/style.css">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Schedule Maker</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f1f2e">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- iOS full-screen app -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Schedule">
+
+    <link rel="stylesheet" href="CSS/style.css">
 </head>
 
 <body>
@@ -200,6 +211,11 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="JS/script.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+      }
+    </script>
 </body>
 
 </html>

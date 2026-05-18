@@ -1,12 +1,24 @@
 /* ═══════════════════════════════════════════
    RESET & BASE
 ═══════════════════════════════════════════ */
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body {
   font-family: 'Segoe UI', system-ui, Arial, sans-serif;
   font-size: 12px;
   background: #e8edf4;
   color: #1e293b;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+/* Prevent text selection on interactive table elements */
+.task-bar, .group-hdr, .name-cell, .tb-btn, .add-person-btn {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Snappy tap response on all buttons */
+.tb-btn:active, .add-person-btn:active, .modal-btns button:active {
+  opacity: 0.75;
+  transform: scale(0.96);
 }
 
 /* ═══════════════════════════════════════════
@@ -16,6 +28,9 @@ body {
   background: linear-gradient(90deg, #0f1f2e 0%, #1a3349 100%);
   color: #fff;
   padding: 10px 18px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-left:  max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   box-shadow: 0 3px 10px rgba(0,0,0,0.4);
   position: sticky; top: 0; z-index: 50;
@@ -49,6 +64,8 @@ body {
 #schedule-wrapper {
   padding: 14px 14px 6px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom, 6px);
 }
 
 /* ═══════════════════════════════════════════
