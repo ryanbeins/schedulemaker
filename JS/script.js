@@ -493,29 +493,39 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
       const badge = document.createElement('span');
       badge.className = 'task-violation-badge';
       badge.textContent = '⚠';
-      badge.title = 'Click to ignore this alert';
-      badge.addEventListener('click', (e) => {
+      badge.title = 'Tap to ignore this alert';
+      // Stop bar's touchstart from starting a drag when tapping the badge
+      badge.addEventListener('touchstart', (e) => {
         e.stopPropagation();
         e.preventDefault();
-        openIgnoreModal(task.id, task.label || task.type);
-      });
+      }, { passive: false });
       badge.addEventListener('touchend', (e) => {
         e.stopPropagation();
         e.preventDefault();
         openIgnoreModal(task.id, task.label || task.type);
       }, { passive: false });
+      // Desktop click
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openIgnoreModal(task.id, task.label || task.type);
+      });
       bar.appendChild(badge);
     } else if (ignored && taskDurationHrs(task) > 3.0001) {
       // Show a muted "ignored" dot so user knows it was suppressed
       const dot = document.createElement('span');
       dot.className = 'task-ignored-dot';
-      dot.title = 'Violation ignored — click to restore';
+      dot.title = 'Violation ignored — tap to restore';
       dot.textContent = '✓';
+      dot.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
+      dot.addEventListener('touchend', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        data.meta.ignoredViolations = (data.meta.ignoredViolations || []).filter(id => id !== task.id);
+        saveToStorage(); render();
+      }, { passive: false });
       dot.addEventListener('click', (e) => {
         e.stopPropagation();
         data.meta.ignoredViolations = (data.meta.ignoredViolations || []).filter(id => id !== task.id);
-        saveToStorage();
-        render();
+        saveToStorage(); render();
       });
       bar.appendChild(dot);
     }
@@ -1170,12 +1180,22 @@ document.addEventListener('touchend', () => { handleDragEnd(); });
 const STORAGE_KEY     = 'scheduleGen_data';
 const STORAGE_GEN_KEY = 'scheduleGen_genRequirements';
 
+// All meta fields with safe defaults — any missing field on load gets its default
+const META_DEFAULTS = {
+  flag0600: '', flag1800: '',
+  prowl: '', nightProwl1: '', nightProwl2: '',
+  strength: '00 / 00 / 00', svcAvg: 0, notes: [],
+  ignoredViolations: [],
+  date: new Date().toISOString().slice(0, 10),
+};
+
 function saveToStorage() {
   try {
     localStorage.setItem(STORAGE_KEY,     JSON.stringify(data));
     localStorage.setItem(STORAGE_GEN_KEY, JSON.stringify(genRequirements));
+    flashSaveIndicator();
   } catch (e) {
-    console.warn('Could not save to localStorage:', e);
+    console.warn('localStorage write failed:', e);
   }
 }
 
@@ -1188,18 +1208,27 @@ function loadFromStorage() {
       data.wbgt      = parsed.wbgt      ?? data.wbgt;
       data.groups    = parsed.groups    ?? data.groups;
       data.personnel = parsed.personnel ?? data.personnel;
-      data.meta      = { ...data.meta,  ...(parsed.meta ?? {}) };
-
-      const rolePatches = { 'Ryan': 'GC' };
-      data.personnel.forEach(p => {
-        if (rolePatches[p.name] !== undefined) p.role = rolePatches[p.name];
-      });
+      // Merge saved meta over defaults so new fields always have safe values
+      data.meta = { ...META_DEFAULTS, ...data.meta, ...(parsed.meta ?? {}) };
+      data.meta.ignoredViolations = Array.isArray(data.meta.ignoredViolations)
+        ? data.meta.ignoredViolations : [];
     }
     const savedGen = localStorage.getItem(STORAGE_GEN_KEY);
     if (savedGen) genRequirements = JSON.parse(savedGen);
   } catch (e) {
-    console.warn('Could not load from localStorage:', e);
+    console.warn('localStorage read failed:', e);
   }
+}
+
+// Brief "Saved ✓" flash in the toolbar
+let _saveTimer = null;
+function flashSaveIndicator() {
+  let el = document.getElementById('save-indicator');
+  if (!el) return;
+  el.textContent = '✔ Saved';
+  el.style.opacity = '1';
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
 }
 
 // ═══════════════════════════════════════════════
