@@ -491,7 +491,7 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
       bar.classList.add('task-violation');
       const badge = document.createElement('span');
       badge.className = 'task-violation-badge';
-      badge.textContent = '!!!!';
+      badge.textContent = '⚠';
       bar.appendChild(badge);
     }
 
@@ -509,7 +509,7 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
   d2Cell.className = 'total-cell total-d2';
   if (issues.length > 0) {
     d2Cell.classList.add('violation-cell');
-    d2Cell.innerHTML = `<span>${hrs > 0 ? hrs.toFixed(2) : '—'}</span><span class="violation-exclaim"> !!!!</span>`;
+    d2Cell.innerHTML = `<span>${hrs > 0 ? hrs.toFixed(2) : '—'}</span><span class="violation-exclaim">⚠</span>`;
   } else {
     d2Cell.textContent = hrs > 0 ? hrs.toFixed(2) : '';
   }
