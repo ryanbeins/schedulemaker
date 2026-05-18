@@ -117,7 +117,9 @@ let data = {
   ],
   meta: {
     flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
-    prowl: 'Adlan,ZZ', strength: '02 / 06 / 02', svcAvg: 4.5, notes: [],
+    prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
+    strength: '02 / 06 / 02', svcAvg: 4.5, notes: [],
+    date: new Date().toISOString().slice(0, 10),
   },
 };
 
@@ -133,7 +135,7 @@ function isSilentSlot(slot) { return SILENT_STARTS.has(slot.start); }
 // Visual scale: silent slots get 0.5× space, non-silent get 1.5× space
 // Morning silent slots (2000–0800) stay squashed; evening 1800–2000 matches non-silent width
 const MORNING_SILENT = new Set(['2000', '0000', '0400']);
-const VISUAL_SLOT_WEIGHTS = TIME_SLOTS.map(s => MORNING_SILENT.has(s.start) ? 0.5 : 1.5);
+const VISUAL_SLOT_WEIGHTS = TIME_SLOTS.map(s => MORNING_SILENT.has(s.start) ? 0.40 : 1.60);
 
 const SLOT_BOUNDARIES = (() => {
   const b = [];
@@ -147,6 +149,14 @@ const SLOT_BOUNDARIES = (() => {
   return b;
 })();
 const TOTAL_VISUAL_UNITS = SLOT_BOUNDARIES[SLOT_BOUNDARIES.length - 1].vu;
+
+// Keep timeline background gradient in sync with visual weights
+(function applyTimelineGradient() {
+  const m = (minsToVisualPct(timeToMins('0800'))).toFixed(3) + '%';
+  const e = (minsToVisualPct(timeToMins('1800'))).toFixed(3) + '%';
+  document.documentElement.style.setProperty('--timeline-morning', m);
+  document.documentElement.style.setProperty('--timeline-evening', e);
+}());
 
 // Maps actual offset-mins (from DAY_START) → visual % within timeline cell
 function minsToVisualPct(mins) {
@@ -252,14 +262,14 @@ function assignLanes(tasks) {
 // ═══════════════════════════════════════════════
 
 // Column widths — weighted: silent cols squashed, non-silent cols expanded
-const TIMELINE_PCT = 81;
+const TIMELINE_PCT = 86.5;
 const COL_WIDTHS = [
-  '8%',
+  '10%',
   ...TIME_SLOTS.map((s, i) => {
     const vu = s.hours * 60 * VISUAL_SLOT_WEIGHTS[i];
     return (TIMELINE_PCT * vu / TOTAL_VISUAL_UNITS).toFixed(4) + '%';
   }),
-  '3.5%', '3.5%', '4%',
+  '3.5%',
 ];
 
 function render() {
@@ -289,17 +299,18 @@ function renderHead() {
   th(r1, 'Silent Hours', 1, 3).classList.add('super-silent');
   th(r1, 'Non-Silent Hours', 1, 5).classList.add('super-nonsilent');
   th(r1, 'Silent Hours', 1, 1).classList.add('super-silent');
-  th(r1, 'Total', 1, 3);
+  th(r1, 'Total', 1, 1);
 
   const r2 = thead.insertRow();
   r2.className = 'hdr-top';
   th(r2, `Day ${data.day}`);
   TIME_SLOTS.forEach(s => {
-    th(r2, s.label).classList.add(isSilentSlot(s) ? 'col-silent' : 'col-nonsilent');
+    const isMorn = MORNING_SILENT.has(s.start);
+    const cell = th(r2, s.label);
+    cell.classList.add(isSilentSlot(s) ? 'col-silent' : 'col-nonsilent');
+    if (isMorn) cell.classList.add('col-narrow');
   });
   th(r2, 'Total D2');
-  th(r2, 'Total D1');
-  th(r2, 'Total hr Mount');
 
   const r3 = thead.insertRow();
   r3.className = 'hdr-wbgt';
@@ -308,9 +319,9 @@ function renderHead() {
     const code = data.wbgt[s.start] || 'WHITE';
     const cell = r3.insertCell();
     cell.textContent = code;
-    cell.className = (WBGT_CLASSES[code] || 'wbgt-white') + (isSilentSlot(s) ? ' wbgt-silent-col' : '');
+    cell.className = (WBGT_CLASSES[code] || 'wbgt-white') + (isSilentSlot(s) ? ' wbgt-silent-col' : '') + (MORNING_SILENT.has(s.start) ? ' wbgt-narrow' : '');
   });
-  r3.insertCell(); r3.insertCell(); r3.insertCell();
+  r3.insertCell();
 }
 
 function th(row, text, rowspan = 1, colspan = 1) {
@@ -334,22 +345,23 @@ function renderBody() {
     const gRow = tbody.insertRow();
     gRow.className = 'group-hdr';
     const gCell = gRow.insertCell();
-    gCell.colSpan = 13;
-    gCell.textContent = group.label;
+    gCell.colSpan = 11;
+    gCell.style.display = 'flex';
+    gCell.style.alignItems = 'center';
+    gCell.style.gap = '10px';
+    const gLabel = document.createElement('span');
+    gLabel.textContent = group.label;
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-person-btn';
+    addBtn.innerHTML = '<span class="add-btn-icon">+</span><span class="add-btn-label">Add</span>';
+    addBtn.title = `Add person to ${group.label}`;
+    addBtn.onclick = () => openAddPersonModal(group.id);
+    gCell.appendChild(gLabel);
+    gCell.appendChild(addBtn);
 
     data.personnel
       .filter(p => p.group === group.id)
       .forEach(person => renderPersonRow(tbody, person, avg, constraintCache));
-
-    const addRow = tbody.insertRow();
-    const addCell = addRow.insertCell();
-    addCell.colSpan = 13;
-    addCell.style.border = 'none';
-    const addBtn = document.createElement('button');
-    addBtn.className = 'add-person-btn';
-    addBtn.textContent = `+ Add person to ${group.label}`;
-    addBtn.onclick = () => openAddPersonModal(group.id);
-    addCell.appendChild(addBtn);
   });
 
   renderFooter(tbody, constraintCache);
@@ -375,11 +387,33 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
   nameCell.style.height = rowH + 'px';
   nameCell.style.lineHeight = rowH + 'px';
 
+  // Build per-slot WBGT-coloured background aligned with SLOT_BOUNDARIES
+  const NIGHT_BG = '#1a2535';
+  const WBGT_TINT = { WHITE:'#f8fafc', GREEN:'rgba(22,163,74,0.10)', RED:'rgba(220,38,38,0.08)', YELLOW:'rgba(234,179,8,0.10)', BLACK:'rgba(30,41,59,0.18)' };
+  const gradStops = [];
+  TIME_SLOTS.forEach((slot, i) => {
+    const s = (SLOT_BOUNDARIES[i].vu     / TOTAL_VISUAL_UNITS * 100).toFixed(3) + '%';
+    const e = (SLOT_BOUNDARIES[i + 1].vu / TOTAL_VISUAL_UNITS * 100).toFixed(3) + '%';
+    const isNight = MORNING_SILENT.has(slot.start) || slot.start === '1800';
+    const color   = isNight ? NIGHT_BG : (WBGT_TINT[data.wbgt[slot.start] || 'WHITE'] || '#f8fafc');
+    gradStops.push(`${color} ${s}`, `${color} ${e}`);
+  });
+  timeCell.style.background = `linear-gradient(to right,${gradStops.join(',')})`;
+
+
   const clickZone = document.createElement('div');
   clickZone.className = 'timeline-click-zone';
   clickZone.title = 'Click to add task';
   clickZone.onclick = (e) => onTimelineClick(e, person.id, timeCell);
   timeCell.appendChild(clickZone);
+
+  // Silent/non-silent boundary markers at 0800 and 1800
+  [timeToMins('0800'), timeToMins('1800')].forEach(m => {
+    const mk = document.createElement('div');
+    mk.className = 'timeline-boundary';
+    mk.style.left = minsToVisualPct(m) + '%';
+    timeCell.appendChild(mk);
+  });
 
   person.tasks.forEach(task => {
     const bar = document.createElement('div');
@@ -410,6 +444,17 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
 
     bar.style.cursor  = 'grab';
     bar.onmousedown   = (e) => startBarDrag(e, person.id, task.id, timeCell);
+    bar.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      initDragState(e.touches[0].clientX, person.id, task.id, timeCell, bar, false);
+    }, { passive: false });
+    bar.addEventListener('touchend', () => {
+      if (!dragState || dragState.taskId !== task.id) return;
+      const wasMoved = dragState.moved;
+      handleDragEnd();
+      if (!wasMoved) openEditTaskModal(person.id, task.id);
+    });
     bar.onmousemove   = (e) => {
       if (dragState) return;
       bar.style.cursor = e.clientX > bar.getBoundingClientRect().right - 10 ? 'ew-resize' : 'grab';
@@ -424,6 +469,11 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     rh.className    = 'resize-handle';
     rh.title        = 'Drag to resize';
     rh.onmousedown  = (e) => { e.stopPropagation(); startBarDrag(e, person.id, task.id, timeCell); };
+    rh.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      initDragState(e.touches[0].clientX, person.id, task.id, timeCell, bar, true);
+    }, { passive: false });
     bar.appendChild(rh);
 
     timeCell.appendChild(bar);
@@ -444,62 +494,142 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     d2Cell.title = '* Hours exceeded avg by >3×';
   }
 
-  row.insertCell().className = 'total-cell total-d1';
-  row.insertCell().className = 'total-cell total-hr';
+}
+
+function makeFooterEditable(cell, getV, setV, opts = {}) {
+  cell.classList.add('footer-editable');
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = getV();
+  inp.className = 'footer-editable-input';
+  if (opts.textAlign)  inp.style.textAlign = opts.textAlign;
+  if (opts.inputMode)  inp.inputMode = opts.inputMode;
+  inp.addEventListener('blur', () => { setV(inp.value.trim()); saveToStorage(); inp.value = getV(); });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { inp.value = getV(); inp.blur(); }
+  });
+  cell.appendChild(inp);
 }
 
 function renderFooter(tbody, constraintCache) {
-  tbody.insertRow().insertCell().colSpan = 13;
+  const divRow = tbody.insertRow();
+  divRow.insertCell().colSpan = 11;
+  divRow.cells[0].className = 'footer-divider';
 
+  // === Flag row ===
   const flagRow = tbody.insertRow();
-  flagRow.className = 'footer-row';
+  flagRow.className = 'footer-row footer-flags';
   flagRow.insertCell().colSpan = 2;
-  flagRow.insertCell().colSpan = 2;
-  flagRow.cells[1].innerHTML = '<b>0600 Flag:</b>';
-  const fc3 = flagRow.insertCell(); fc3.colSpan = 3; fc3.textContent = data.meta.flag0600;
-  flagRow.insertCell().colSpan = 2;
-  flagRow.cells[3].innerHTML = '<b>1800 flag:</b>';
-  const fc5 = flagRow.insertCell(); fc5.colSpan = 4; fc5.textContent = data.meta.flag1800;
+  const fl1 = flagRow.insertCell(); fl1.colSpan = 2; fl1.innerHTML = '<b>0600 Flag:</b>';
+  const fc3 = flagRow.insertCell(); fc3.colSpan = 3;
+  makeFooterEditable(fc3, () => data.meta.flag0600, v => { data.meta.flag0600 = v; });
+  const fl3 = flagRow.insertCell(); fl3.colSpan = 2; fl3.innerHTML = '<b>1800 flag:</b>';
+  const fc5 = flagRow.insertCell(); fc5.colSpan = 2;
+  makeFooterEditable(fc5, () => data.meta.flag1800, v => { data.meta.flag1800 = v; });
 
+  // === Prowl row ===
   const prowlRow = tbody.insertRow();
   prowlRow.className = 'footer-row';
-  prowlRow.insertCell();
-  prowlRow.insertCell().textContent = '[ ]';
-  prowlRow.cells[1].style.textAlign = 'center';
+  const cbCell = prowlRow.insertCell();
+  cbCell.colSpan = 2;
+  cbCell.style.textAlign = 'center';
+  cbCell.style.padding = '4px 8px';
+  const dateInput = document.createElement('input');
+  dateInput.type = 'date';
+  dateInput.value = data.meta.date || new Date().toISOString().slice(0, 10);
+  dateInput.className = 'footer-date-input';
+  dateInput.onchange = () => { data.meta.date = dateInput.value; saveToStorage(); };
+  cbCell.appendChild(dateInput);
+
   const pr2 = prowlRow.insertCell(); pr2.colSpan = 2;
-  pr2.innerHTML = `<b>Morning Prowl:</b> ${data.meta.prowl}`;
-  prowlRow.insertCell().colSpan = 2;
-  prowlRow.insertCell().colSpan = 2;
-  prowlRow.cells[4].innerHTML = '<b>Total Strength</b>';
-  const pr6 = prowlRow.insertCell(); pr6.colSpan = 4; pr6.textContent = data.meta.strength;
+  pr2.innerHTML = '<b>Morning Prowl:</b>';
+  const prowlInp = document.createElement('input');
+  prowlInp.type = 'text';
+  prowlInp.value = data.meta.prowl;
+  prowlInp.className = 'footer-editable-input inline';
+  prowlInp.addEventListener('blur', () => { data.meta.prowl = prowlInp.value.trim(); saveToStorage(); });
+  prowlInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); prowlInp.blur(); } });
+  pr2.appendChild(prowlInp);
 
-  tbody.insertRow().insertCell().colSpan = 13;
+  prowlRow.insertCell().colSpan = 1;
+  const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength</b>';
+  const pr6 = prowlRow.insertCell(); pr6.colSpan = 3;
 
+  const strParts = (data.meta.strength || '00 / 00 / 00').split('/').map(p => p.trim());
+  const strDiv = document.createElement('div');
+  strDiv.className = 'strength-fields';
+  ['GC', 'CBT', 'SVC'].forEach((lbl, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'strength-field';
+    const label = document.createElement('span');
+    label.textContent = lbl;
+    label.className = 'strength-label';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = strParts[i] || '00';
+    inp.className = 'footer-editable-input strength-inp';
+    inp.inputMode = 'numeric';
+    inp.maxLength = 3;
+    const save = () => {
+      const vals = [...strDiv.querySelectorAll('input')].map(x => x.value.trim() || '00');
+      data.meta.strength = vals.join(' / ');
+      saveToStorage();
+    };
+    inp.addEventListener('blur', save);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    wrap.appendChild(label);
+    wrap.appendChild(inp);
+    strDiv.appendChild(wrap);
+  });
+  pr6.appendChild(strDiv);
+
+  function makeInlineEditable(parent, metaKey) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = data.meta[metaKey];
+    inp.className = 'footer-editable-input inline';
+    inp.addEventListener('blur', () => { data.meta[metaKey] = inp.value.trim(); saveToStorage(); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    parent.appendChild(inp);
+  }
+
+  const nightProwlRow1 = tbody.insertRow();
+  nightProwlRow1.className = 'footer-row';
+  nightProwlRow1.insertCell().colSpan = 2;
+  const np1 = nightProwlRow1.insertCell(); np1.colSpan = 9;
+  np1.innerHTML = '<b>1st Night Prowl:</b> ';
+  makeInlineEditable(np1, 'nightProwl1');
+
+  const nightProwlRow2 = tbody.insertRow();
+  nightProwlRow2.className = 'footer-row';
+  nightProwlRow2.insertCell().colSpan = 2;
+  const np2 = nightProwlRow2.insertCell(); np2.colSpan = 9;
+  np2.innerHTML = '<b>2nd Night Prowl:</b> ';
+  makeInlineEditable(np2, 'nightProwl2');
+
+  tbody.insertRow().insertCell().colSpan = 11;
+
+  // === Service avg row ===
   const svcRow = tbody.insertRow();
-  svcRow.className = 'footer-row service-avg';
+  svcRow.className = 'footer-row footer-svc service-avg';
   svcRow.insertCell().colSpan = 5;
   const svc2 = svcRow.insertCell(); svc2.colSpan = 3;
   svc2.innerHTML = '<b>Service Avg Mounting hrs</b>';
   svc2.style.textAlign = 'right';
   const svc3 = svcRow.insertCell(); svc3.colSpan = 2;
-  svc3.textContent = data.meta.svcAvg;
+  makeFooterEditable(svc3, () => String(data.meta.svcAvg), v => { data.meta.svcAvg = parseFloat(v) || 0; }, { textAlign: 'center', inputMode: 'decimal' });
   svc3.style.textAlign = 'center';
   svcRow.insertCell().colSpan = 2;
 
-  const legRow = tbody.insertRow();
-  legRow.className = 'footer-row';
-  legRow.insertCell().colSpan = 6;
-  const legRight = legRow.insertCell();
-  legRight.colSpan = 7;
-  legRight.innerHTML = '<b>Day Only</b> &nbsp;&nbsp; <b>Night Only</b> &nbsp;&nbsp; <b>GC</b>';
 
   const clRow = tbody.insertRow();
-  clRow.className = 'footer-row';
+  clRow.className = 'footer-row footer-cl';
   const clCell = clRow.insertCell();
-  clCell.colSpan = 13;
+  clCell.colSpan = 11;
   clCell.innerHTML =
-    '<span class="constraint-ok">☑ 3hrs per shift</span> &nbsp;&nbsp; ' +
-    '<span class="constraint-ok">☑ ≥ 1hr break after shift</span>';
+    '<span class="constraint-ok">✔ 3 hrs per shift</span>' +
+    '<span class="constraint-ok">✔ ≥ 1 hr break after shift</span>';
 }
 
 // ═══════════════════════════════════════════════
@@ -872,6 +1002,19 @@ let dragState    = null;
 let lastDragMoved = false;
 const SNAP_MINS  = 30;
 
+function initDragState(clientX, personId, taskId, timelineCell, bar, isResize) {
+  dragState = {
+    type: isResize ? 'resize' : 'move',
+    bar, personId, taskId, timelineCell,
+    startMouseX: clientX,
+    origLeft:  parseFloat(bar.style.left),
+    origWidth: parseFloat(bar.style.width),
+    moved: false,
+  };
+  bar.classList.add('dragging');
+  document.body.style.cursor = isResize ? 'ew-resize' : 'grabbing';
+}
+
 function startBarDrag(e, personId, taskId, timelineCell) {
   if (e.button !== 0) return;
   e.preventDefault();
@@ -880,25 +1023,14 @@ function startBarDrag(e, personId, taskId, timelineCell) {
   const isHandle = e.currentTarget.classList.contains('resize-handle');
   const bar      = isHandle ? e.currentTarget.parentElement : e.currentTarget;
   const isResize = isHandle || e.clientX > bar.getBoundingClientRect().right - 10;
-
-  dragState = {
-    type: isResize ? 'resize' : 'move',
-    bar, personId, taskId, timelineCell,
-    startMouseX: e.clientX,
-    origLeft:  parseFloat(bar.style.left),
-    origWidth: parseFloat(bar.style.width),
-    moved: false,
-  };
-
-  bar.classList.add('dragging');
-  document.body.style.cursor = isResize ? 'ew-resize' : 'grabbing';
+  initDragState(e.clientX, personId, taskId, timelineCell, bar, isResize);
 }
 
-document.addEventListener('mousemove', (e) => {
+function handleDragMove(clientX, clientY) {
   if (!dragState) return;
 
   const cellW  = dragState.timelineCell.getBoundingClientRect().width;
-  const dxPx   = e.clientX - dragState.startMouseX;
+  const dxPx   = clientX - dragState.startMouseX;
   const dxPct  = (dxPx / cellW) * 100;
 
   if (Math.abs(dxPx) > 5) dragState.moved = true;
@@ -926,12 +1058,12 @@ document.addEventListener('mousemove', (e) => {
 
   const tip = document.getElementById('drag-tooltip');
   tip.textContent = sTime + ' – ' + eTime;
-  tip.style.left  = (e.clientX + 14) + 'px';
-  tip.style.top   = (e.clientY - 32) + 'px';
+  tip.style.left  = (clientX + 14) + 'px';
+  tip.style.top   = (clientY - 32) + 'px';
   tip.style.display = '';
-});
+}
 
-document.addEventListener('mouseup', () => {
+function handleDragEnd() {
   if (!dragState) return;
 
   const { bar, personId, taskId, moved } = dragState;
@@ -953,7 +1085,16 @@ document.addEventListener('mouseup', () => {
   }
 
   dragState = null;
-});
+}
+
+document.addEventListener('mousemove', (e) => { handleDragMove(e.clientX, e.clientY); });
+document.addEventListener('mouseup',   () =>  { handleDragEnd(); });
+document.addEventListener('touchmove', (e) => {
+  if (!dragState) return;
+  e.preventDefault();
+  handleDragMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+document.addEventListener('touchend', () => { handleDragEnd(); });
 
 // ═══════════════════════════════════════════════
 //  LOCAL STORAGE PERSISTENCE
@@ -1004,6 +1145,71 @@ function hexLuminance(hex) {
   const b = parseInt(hex.slice(4, 6), 16) / 255;
   const lin = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+// ═══════════════════════════════════════════════
+//  TOOLBAR MOBILE MENU
+// ═══════════════════════════════════════════════
+function toggleToolbarMenu() {
+  document.getElementById('toolbar').classList.toggle('menu-open');
+}
+document.addEventListener('click', (e) => {
+  const toolbar = document.getElementById('toolbar');
+  if (toolbar.classList.contains('menu-open') && !toolbar.contains(e.target)) {
+    toolbar.classList.remove('menu-open');
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  SCREENSHOT
+// ═══════════════════════════════════════════════
+async function captureScreenshot(btn) {
+  if (typeof html2canvas === 'undefined') {
+    alert('Screenshot library not loaded — please refresh and try again.');
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = '⏳…';
+  btn.disabled = true;
+
+  const wrapper  = document.getElementById('schedule-wrapper');
+  const table    = document.getElementById('schedule-table');
+  const area     = document.getElementById('capture-area');
+
+  // Temporarily expand so full table width is captured
+  const prevWrapperOverflow = wrapper.style.overflowX;
+  const prevTableWidth      = table.style.minWidth;
+  const fullW = Math.max(table.scrollWidth, 1400);
+  wrapper.style.overflowX = 'visible';
+  table.style.minWidth    = fullW + 'px';
+
+  // Give browser one frame to reflow
+  await new Promise(r => requestAnimationFrame(r));
+
+  try {
+    const canvas = await html2canvas(area, {
+      scale: 1.8,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#e8edf4',
+      width:  area.scrollWidth,
+      height: area.scrollHeight,
+      windowWidth:  area.scrollWidth,
+      windowHeight: area.scrollHeight,
+    });
+
+    const a = document.createElement('a');
+    a.download = `schedule_day${data.day}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  } catch (err) {
+    alert('Screenshot failed — use 🖨 Print instead.');
+  }
+
+  wrapper.style.overflowX = prevWrapperOverflow;
+  table.style.minWidth    = prevTableWidth;
+  btn.textContent = orig;
+  btn.disabled    = false;
 }
 
 // ═══════════════════════════════════════════════

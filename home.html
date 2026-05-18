@@ -14,30 +14,40 @@
     <div id="toolbar">
         <h1>⏱ Schedule Maker</h1>
         <span class="tb-sep"></span>
-        <label>Day: <input type="number" id="day-input" value="3" min="1" max="99" oninput="setDay(this.value)"></label>
-        <span class="tb-sep"></span>
-        <button class="tb-btn green" onclick="openAddPersonModal(null)">+ Add Person</button>
-        <button class="tb-btn blue" onclick="openWBGTModal()">Edit WBGT</button>
-        <button class="tb-btn orange" onclick="openMetaModal()">Edit Notes</button>
-        <button class="tb-btn purple" onclick="openGeneratorModal()">⚡ Generate</button>
-        <button class="tb-btn grey" onclick="window.print()">🖨 Print</button>
-        <button class="tb-btn teal" onclick="exportData()">⬇ Export</button>
-        <label class="tb-btn teal" style="cursor:pointer">⬆ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
-        <span class="tb-sep"></span>
-        <span style="font-size:10px;color:#aaa">Click timeline to add task · Click task to edit</span>
+        <label>Day:
+            <select id="day-input" onchange="setDay(this.value)">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+            </select>
+        </label>
+        <button class="tb-btn grey tb-hamburger" onclick="toggleToolbarMenu()" aria-label="Menu">☰</button>
+        <div id="tb-menu">
+            <button class="tb-btn blue" onclick="openWBGTModal()">Edit WBGT</button>
+            <button class="tb-btn purple" onclick="openGeneratorModal()">⚡ Generate</button>
+            <button class="tb-btn grey" onclick="window.print()">🖨 Print</button>
+            <button class="tb-btn teal" onclick="exportData()">⬇ Export</button>
+            <label class="tb-btn teal" style="cursor:pointer">⬆ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+            <button class="tb-btn indigo" onclick="captureScreenshot(this)">📸 Screenshot</button>
+        </div>
+        <span class="tb-sep tb-hint"></span>
+        <span class="tb-hint" style="font-size:10px;color:#aaa">Click timeline to add task · Click task to edit</span>
     </div>
+    <div id="mobile-scroll-hint">&#8592; Swipe to view full schedule &nbsp;·&nbsp; Tap timeline to add task &#8594;</div>
 
     <!-- SCHEDULE -->
-    <div id="schedule-wrapper">
-        <table id="schedule-table">
-            <thead id="table-head"></thead>
-            <tbody id="table-body"></tbody>
-        </table>
-    </div>
-    <div id="constraint-legend">
-        ✔ <b>3 hrs per shift</b> &nbsp;|&nbsp; ✔ <b>≥ 1 hr break after shift</b> &nbsp;|&nbsp;
-        <span class="warn">*</span> = Hours exceeded avg by &gt;3× &nbsp;|&nbsp;
-        <b>NMT</b>: No move time (24 hrs standby)
+    <div id="capture-area">
+        <div id="schedule-wrapper">
+            <table id="schedule-table">
+                <thead id="table-head"></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+        <div id="constraint-legend">
+            ✔ <b>3 hrs per shift</b> &nbsp;|&nbsp; ✔ <b>≥ 1 hr break after shift</b> &nbsp;|&nbsp;
+            <span class="warn">*</span> = Hours exceeded avg by &gt;3× &nbsp;|&nbsp;
+            <b>NMT</b>: No move time (24 hrs standby)
+        </div>
     </div>
 
     <!-- ── MODALS ── -->
@@ -88,11 +98,11 @@
             <div class="form-row">
                 <div>
                     <label>Start Time (HHMM)</label>
-                    <input type="text" id="t-start" placeholder="e.g. 0700" maxlength="4">
+                    <input type="text" id="t-start" placeholder="e.g. 0700" maxlength="4" inputmode="numeric" pattern="[0-9]*">
                 </div>
                 <div>
                     <label>End Time (HHMM)</label>
-                    <input type="text" id="t-end" placeholder="e.g. 0900" maxlength="4">
+                    <input type="text" id="t-end" placeholder="e.g. 0900" maxlength="4" inputmode="numeric" pattern="[0-9]*">
                 </div>
             </div>
             <label>Color <span id="color-preview"
@@ -140,6 +150,7 @@
             </div>
         </div>
     </div>
+
     <!-- Generator Modal -->
     <div class="modal-overlay" id="modal-generator">
         <div class="modal modal-wide">
@@ -187,6 +198,7 @@
     <!-- Drag time tooltip -->
     <div id="drag-tooltip"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="JS/script.js"></script>
 </body>
 
