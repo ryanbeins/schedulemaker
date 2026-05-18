@@ -493,22 +493,19 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
       const badge = document.createElement('span');
       badge.className = 'task-violation-badge';
       badge.textContent = '⚠';
-      badge.title = 'Double-click to ignore this alert';
-      badge.addEventListener('dblclick', (e) => {
+      badge.title = 'Click to ignore this alert';
+      badge.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!data.meta.ignoredViolations) data.meta.ignoredViolations = [];
-        data.meta.ignoredViolations.push(task.id);
-        saveToStorage();
-        render();
+        openIgnoreModal(task.id, task.label || task.type);
       });
       bar.appendChild(badge);
     } else if (ignored && taskDurationHrs(task) > 3.0001) {
       // Show a muted "ignored" dot so user knows it was suppressed
       const dot = document.createElement('span');
       dot.className = 'task-ignored-dot';
-      dot.title = 'Violation ignored (manpower shortage) — double-click to restore';
+      dot.title = 'Violation ignored — click to restore';
       dot.textContent = '✓';
-      dot.addEventListener('dblclick', (e) => {
+      dot.addEventListener('click', (e) => {
         e.stopPropagation();
         data.meta.ignoredViolations = (data.meta.ignoredViolations || []).filter(id => id !== task.id);
         saveToStorage();
@@ -1212,6 +1209,22 @@ function hexLuminance(hex) {
   const b = parseInt(hex.slice(4, 6), 16) / 255;
   const lin = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+// ═══════════════════════════════════════════════
+//  IGNORE VIOLATION MODAL
+// ═══════════════════════════════════════════════
+function openIgnoreModal(taskId, taskLabel) {
+  document.getElementById('ignore-modal-label').textContent = `"${taskLabel}" exceeds 3 hrs. Ignore due to manpower shortage?`;
+  document.getElementById('modal-ignore').classList.add('open');
+  document.getElementById('ignore-yes-btn').onclick = () => {
+    if (!data.meta.ignoredViolations) data.meta.ignoredViolations = [];
+    data.meta.ignoredViolations.push(taskId);
+    saveToStorage();
+    closeModal('modal-ignore');
+    render();
+  };
+  document.getElementById('ignore-no-btn').onclick = () => closeModal('modal-ignore');
 }
 
 // ═══════════════════════════════════════════════

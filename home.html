@@ -57,7 +57,7 @@
             ✔ <b>3 hrs per shift</b> &nbsp;|&nbsp; ✔ <b>≥ 1 hr break after shift</b> &nbsp;|&nbsp;
             <span class="warn">*</span> = Hours exceeded avg by &gt;3× &nbsp;|&nbsp;
             <b>NMT</b>: No move time (24 hrs standby) &nbsp;|&nbsp;
-            <span class="legend-ignore-tip"><span class="legend-warn-icon">⚠</span> <b>Double-click</b> the alert icon to ignore (manpower shortage)</span>
+            <span class="legend-ignore-tip"><span class="legend-warn-icon">⚠</span> <b>Tap</b> the alert icon to ignore (manpower shortage)</span>
         </div>
     </div>
 
@@ -202,6 +202,19 @@
             <div class="modal-btns" style="margin-top:14px">
                 <button class="btn-cancel" onclick="closeModal('modal-generator')">Cancel</button>
                 <button class="btn-primary" style="background:#7b2ff7" onclick="runGenerator()">⚡ Generate Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ignore Violation Modal -->
+    <div class="modal-overlay" id="modal-ignore">
+        <div class="modal" style="max-width:380px;text-align:center">
+            <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+            <h2 style="margin-bottom:10px">Ignore Alert?</h2>
+            <p id="ignore-modal-label" style="font-size:13px;color:#475569;margin-bottom:20px;line-height:1.5"></p>
+            <div class="modal-btns" style="justify-content:center;gap:12px">
+                <button id="ignore-no-btn" class="btn-cancel" style="flex:1">No</button>
+                <button id="ignore-yes-btn" class="btn-danger" style="flex:1">Yes, Ignore</button>
             </div>
         </div>
     </div>
