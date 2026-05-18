@@ -1249,47 +1249,67 @@ async function captureScreenshot(btn) {
 }
 
 // ═══════════════════════════════════════════════
-//  EXPORT / IMPORT
+//  SHARE AS URL LINK (replaces file export/import)
 // ═══════════════════════════════════════════════
-function exportData() {
-  const payload = JSON.stringify({ data, genRequirements }, null, 2);
-  const blob = new Blob([payload], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `schedule_day${data.day}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+function shareAsLink(btn) {
+  try {
+    const payload = JSON.stringify({ data, genRequirements });
+    const encoded = btoa(unescape(encodeURIComponent(payload)));
+    const url = location.origin !== 'null'
+      ? `${location.origin}${location.pathname}#${encoded}`
+      : `${location.href.split('#')[0]}#${encoded}`;
+
+    const orig = btn.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        btn.textContent = '✔ Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }).catch(() => { promptFallback(url); });
+    } else {
+      promptFallback(url);
+    }
+  } catch (e) {
+    alert('Could not generate link: ' + e.message);
+  }
 }
 
-function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const parsed = JSON.parse(e.target.result);
-      if (parsed.data) {
-        data.day       = parsed.data.day       ?? data.day;
-        data.wbgt      = parsed.data.wbgt      ?? data.wbgt;
-        data.groups    = parsed.data.groups    ?? data.groups;
-        data.personnel = parsed.data.personnel ?? data.personnel;
-        data.meta      = { ...data.meta, ...(parsed.data.meta ?? {}) };
-      }
-      if (parsed.genRequirements) genRequirements = parsed.genRequirements;
-      document.getElementById('day-input').value = data.day;
-      render();
-    } catch {
-      alert('Invalid file — could not import.');
+function promptFallback(url) {
+  const ta = document.createElement('textarea');
+  ta.value = url;
+  ta.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90vw;height:80px;z-index:9999;font-size:12px;padding:8px;border:2px solid #3b82f6;border-radius:8px;';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  setTimeout(() => document.body.removeChild(ta), 3000);
+  alert('Link copied! (also shown in the text box — long-press to copy on mobile)');
+}
+
+function loadFromURL() {
+  const hash = location.hash.slice(1);
+  if (!hash) return false;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(hash))));
+    if (parsed.data) {
+      data.day       = parsed.data.day       ?? data.day;
+      data.wbgt      = parsed.data.wbgt      ?? data.wbgt;
+      data.groups    = parsed.data.groups    ?? data.groups;
+      data.personnel = parsed.data.personnel ?? data.personnel;
+      data.meta      = { ...data.meta, ...(parsed.data.meta ?? {}) };
     }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
+    if (parsed.genRequirements) genRequirements = parsed.genRequirements;
+    history.replaceState(null, '', location.pathname); // clean URL after loading
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
 loadFromStorage();
+const _urlLoaded = loadFromURL();
+if (_urlLoaded) saveToStorage();
 document.getElementById('day-input').value = data.day;
 initColGroup();
 render();
