@@ -1175,12 +1175,11 @@ document.addEventListener('touchmove', (e) => {
 document.addEventListener('touchend', () => { handleDragEnd(); });
 
 // ═══════════════════════════════════════════════
-//  LOCAL STORAGE PERSISTENCE
+//  TOKEN-BASED STORAGE (localStorage + URL hash)
 // ═══════════════════════════════════════════════
-const STORAGE_KEY     = 'scheduleGen_data';
-const STORAGE_GEN_KEY = 'scheduleGen_genRequirements';
+const STORAGE_TOKEN_KEY = 'scheduleGen_token';
 
-// All meta fields with safe defaults — any missing field on load gets its default
+// All meta fields with safe defaults
 const META_DEFAULTS = {
   flag0600: '', flag1800: '',
   prowl: '', nightProwl1: '', nightProwl2: '',
@@ -1189,34 +1188,49 @@ const META_DEFAULTS = {
   date: new Date().toISOString().slice(0, 10),
 };
 
+function applyParsed(parsed) {
+  if (!parsed) return;
+  const d = parsed.data || parsed; // support both {data, genRequirements} and raw data
+  if (d.day       !== undefined) data.day       = d.day;
+  if (d.wbgt      !== undefined) data.wbgt      = d.wbgt;
+  if (d.groups    !== undefined) data.groups    = d.groups;
+  if (d.personnel !== undefined) data.personnel = d.personnel;
+  data.meta = { ...META_DEFAULTS, ...data.meta, ...(d.meta ?? {}) };
+  data.meta.ignoredViolations = Array.isArray(data.meta.ignoredViolations)
+    ? data.meta.ignoredViolations : [];
+  if (parsed.genRequirements) genRequirements = parsed.genRequirements;
+}
+
 function saveToStorage() {
   try {
-    localStorage.setItem(STORAGE_KEY,     JSON.stringify(data));
-    localStorage.setItem(STORAGE_GEN_KEY, JSON.stringify(genRequirements));
+    const token = encodeToken({ data, genRequirements });
+    localStorage.setItem(STORAGE_TOKEN_KEY, token);
     flashSaveIndicator();
   } catch (e) {
-    console.warn('localStorage write failed:', e);
+    console.warn('Token save failed:', e);
   }
 }
 
 function loadFromStorage() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      data.day       = parsed.day       ?? data.day;
-      data.wbgt      = parsed.wbgt      ?? data.wbgt;
-      data.groups    = parsed.groups    ?? data.groups;
-      data.personnel = parsed.personnel ?? data.personnel;
-      // Merge saved meta over defaults so new fields always have safe values
-      data.meta = { ...META_DEFAULTS, ...data.meta, ...(parsed.meta ?? {}) };
-      data.meta.ignoredViolations = Array.isArray(data.meta.ignoredViolations)
-        ? data.meta.ignoredViolations : [];
+    // Try new token format first
+    const token = localStorage.getItem(STORAGE_TOKEN_KEY);
+    if (token) { applyParsed(decodeToken(token)); return; }
+
+    // Migrate from old JSON format if it exists
+    const oldData = localStorage.getItem('scheduleGen_data');
+    if (oldData) {
+      const parsed = JSON.parse(oldData);
+      applyParsed(parsed);
+      const oldGen = localStorage.getItem('scheduleGen_genRequirements');
+      if (oldGen) genRequirements = JSON.parse(oldGen);
+      // Re-save in new token format and clear old keys
+      saveToStorage();
+      localStorage.removeItem('scheduleGen_data');
+      localStorage.removeItem('scheduleGen_genRequirements');
     }
-    const savedGen = localStorage.getItem(STORAGE_GEN_KEY);
-    if (savedGen) genRequirements = JSON.parse(savedGen);
   } catch (e) {
-    console.warn('localStorage read failed:', e);
+    console.warn('Token load failed:', e);
   }
 }
 
@@ -1377,20 +1391,11 @@ function loadFromURL() {
   const hash = location.hash.slice(1);
   if (!hash) return false;
   try {
-    const parsed = decodeToken(hash);
-    if (parsed.data) {
-      data.day       = parsed.data.day       ?? data.day;
-      data.wbgt      = parsed.data.wbgt      ?? data.wbgt;
-      data.groups    = parsed.data.groups    ?? data.groups;
-      data.personnel = parsed.data.personnel ?? data.personnel;
-      data.meta      = { ...data.meta, ...(parsed.data.meta ?? {}) };
-    }
-    if (parsed.genRequirements) genRequirements = parsed.genRequirements;
-    // Remove hash from URL without page reload (safe on file:// too)
+    applyParsed(decodeToken(hash));
     try { history.replaceState(null, '', location.pathname + location.search); } catch {}
     return true;
   } catch {
-    return false; // invalid / corrupted token — silently ignore
+    return false;
   }
 }
 

@@ -222,18 +222,11 @@
     <!-- Drag time tooltip -->
     <div id="drag-tooltip"></div>
 
-    <!-- html2canvas: local copy first, CDN fallback -->
+    <!-- All scripts local — works fully offline -->
     <script src="JS/html2canvas.min.js"></script>
-    <script>
-      if (typeof html2canvas === 'undefined') {
-        var s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        document.head.appendChild(s);
-      }
-    </script>
     <script src="JS/script.js"></script>
     <script>
-      // Service worker only works over HTTP/HTTPS, not file://
+      // Register service worker (HTTP/HTTPS only — caches all assets for offline PWA)
       if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
       }
