@@ -560,6 +560,12 @@ td.total-d2 { background: #fefce8; }
   color: #991b1b !important;
   border-left-color: #dc2626 !important;
 }
+.has-approved {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-left-color: #22c55e !important;
+  font-weight: 700 !important;
+}
 /* ⚠ icon in the Total D2 cell */
 .violation-cell {
   background: #fee2e2 !important;

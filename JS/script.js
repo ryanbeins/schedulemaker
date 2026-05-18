@@ -524,9 +524,17 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
   });
 
   const issues = constraintCache.get(person.id) || [];
-  if (issues.length > 0) {
-    nameCell.title = '⚠ ' + issues.join(' | ');
+  const ignoredIds = data.meta.ignoredViolations || [];
+  const overdueTasks   = person.tasks.filter(t => taskDurationHrs(t) > 3.0001);
+  const activeViol     = overdueTasks.filter(t => !ignoredIds.includes(t.id));
+  const approvedViol   = overdueTasks.filter(t =>  ignoredIds.includes(t.id));
+
+  if (activeViol.length > 0) {
     nameCell.classList.add('has-violation');
+    nameCell.title = '⚠ ' + issues.join(' | ');
+  } else if (approvedViol.length > 0) {
+    nameCell.classList.add('has-approved');
+    nameCell.title = '✓ Violation approved — manpower shortage';
   }
 
   const hrs    = totalHours(person);
