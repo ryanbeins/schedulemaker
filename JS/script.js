@@ -605,10 +605,14 @@ function renderFooter(tbody, constraintCache) {
   // === Flag row ===
   const flagRow = tbody.insertRow();
   flagRow.className = 'footer-row footer-flags';
-  const fl1 = flagRow.insertCell(); fl1.colSpan = 1; fl1.innerHTML = '<b>0600 Flag:</b>';
+  // 0600 Flag: label cell + selects cell (same pattern as 1800 flag)
+  const fl1 = flagRow.insertCell(); fl1.colSpan = 1; fl1.innerHTML = '<b>0600 Flag:</b>'; fl1.style.textAlign = 'right';
   const fc3 = flagRow.insertCell(); fc3.colSpan = 4;
   makeProwlSelects(fc3, 'flag0600', 3);
-  const fl3 = flagRow.insertCell(); fl3.colSpan = 2; fl3.innerHTML = '<b>1800 flag:</b>';
+  // 1800 flag: label right-aligned, selects next cell
+  const fl3 = flagRow.insertCell(); fl3.colSpan = 2;
+  fl3.innerHTML = '<b>1800 flag:</b>';
+  fl3.style.textAlign = 'right';
   const fc5 = flagRow.insertCell(); fc5.colSpan = 4;
   makeProwlSelects(fc5, 'flag1800', 3);
 
@@ -629,8 +633,8 @@ function renderFooter(tbody, constraintCache) {
   const pr2 = prowlRow.insertCell(); pr2.colSpan = 3;
   pr2.innerHTML = '<b>Morning Prowl:</b><br>';
   makeProwlSelects(pr2, 'prowl');
-  const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength</b>';
-  const pr6 = prowlRow.insertCell(); pr6.colSpan = 3;
+  const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength:</b>'; pr4.style.textAlign = 'right';
+  const pr6 = prowlRow.insertCell(); pr6.colSpan = 4;
 
   const strParts = (data.meta.strength || '00 / 00 / 00').split('/').map(p => p.trim());
   const strDiv = document.createElement('div');
@@ -670,12 +674,21 @@ function renderFooter(tbody, constraintCache) {
     parent.appendChild(inp);
   }
 
+  // 1st Night Prowl + Service Avg on same row
   const nightProwlRow1 = tbody.insertRow();
   nightProwlRow1.className = 'footer-row';
   nightProwlRow1.insertCell().colSpan = 2;
-  const np1 = nightProwlRow1.insertCell(); np1.colSpan = 9;
+  const np1 = nightProwlRow1.insertCell(); np1.colSpan = 4;
   np1.innerHTML = '<b>1st Night Prowl:</b><br>';
   makeProwlSelects(np1, 'nightProwl1');
+  const svc2 = nightProwlRow1.insertCell(); svc2.colSpan = 3;
+  svc2.innerHTML = '<b>Service Avg Mounting hrs:</b>';
+  svc2.style.cssText = 'text-align:right;vertical-align:middle;';
+  const svc3 = nightProwlRow1.insertCell(); svc3.colSpan = 2;
+  const computedAvg = calcSvcAvg();
+  data.meta.svcAvg = computedAvg;
+  svc3.textContent = computedAvg > 0 ? computedAvg.toFixed(2) + ' hrs' : '—';
+  svc3.style.cssText = 'text-align:center;font-weight:700;font-size:14px;color:#1d4ed8;vertical-align:middle;';
 
   const nightProwlRow2 = tbody.insertRow();
   nightProwlRow2.className = 'footer-row';
@@ -684,30 +697,7 @@ function renderFooter(tbody, constraintCache) {
   np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
   makeProwlSelects(np2, 'nightProwl2');
 
-  tbody.insertRow().insertCell().colSpan = 11;
 
-  // === Service avg row ===
-  const svcRow = tbody.insertRow();
-  svcRow.className = 'footer-row footer-svc service-avg';
-  svcRow.insertCell().colSpan = 5;
-  const svc2 = svcRow.insertCell(); svc2.colSpan = 3;
-  svc2.innerHTML = '<b>Service Avg Mounting hrs</b>';
-  svc2.style.textAlign = 'right';
-  const svc3 = svcRow.insertCell(); svc3.colSpan = 2;
-  const computedAvg = calcSvcAvg();
-  data.meta.svcAvg = computedAvg;
-  svc3.textContent = computedAvg > 0 ? computedAvg.toFixed(2) + ' hrs' : '—';
-  svc3.style.cssText = 'text-align:center;font-weight:700;font-size:14px;color:#1d4ed8';
-  svcRow.insertCell().colSpan = 2;
-
-
-  const clRow = tbody.insertRow();
-  clRow.className = 'footer-row footer-cl';
-  const clCell = clRow.insertCell();
-  clCell.colSpan = 11;
-  clCell.innerHTML =
-    '<span class="constraint-ok">✔ 3 hrs per shift</span>' +
-    '<span class="constraint-ok">✔ ≥ 1 hr break after shift</span>';
 }
 
 // ═══════════════════════════════════════════════
@@ -1309,44 +1299,56 @@ async function captureScreenshot(btn) {
 // ═══════════════════════════════════════════════
 //  SHARE AS URL LINK (replaces file export/import)
 // ═══════════════════════════════════════════════
+// Encode payload to base64 URL token (Unicode-safe)
+function encodeToken(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+
+// Decode base64 URL token back to object
+function decodeToken(token) {
+  return JSON.parse(decodeURIComponent(escape(atob(token))));
+}
+
 function shareAsLink(btn) {
   try {
-    const payload = JSON.stringify({ data, genRequirements });
-    const encoded = btoa(unescape(encodeURIComponent(payload)));
-    const url = location.origin !== 'null'
-      ? `${location.origin}${location.pathname}#${encoded}`
-      : `${location.href.split('#')[0]}#${encoded}`;
+    const token   = encodeToken({ data, genRequirements });
+    const base    = location.href.split('#')[0]; // works on file:// and http://
+    const url     = base + '#' + token;
+    const orig    = btn.textContent;
 
-    const orig = btn.textContent;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(() => {
-        btn.textContent = '✔ Copied!';
-        setTimeout(() => { btn.textContent = orig; }, 2000);
-      }).catch(() => { promptFallback(url); });
-    } else {
-      promptFallback(url);
-    }
+    const doCopy = (text) => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      // Fallback for file:// or restricted contexts
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    };
+
+    doCopy(url).then(() => {
+      btn.textContent = '✔ Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    }).catch(() => {
+      // Last resort — show URL for manual copy
+      prompt('Copy this link to share your schedule:', url);
+      btn.textContent = orig;
+    });
   } catch (e) {
     alert('Could not generate link: ' + e.message);
   }
-}
-
-function promptFallback(url) {
-  const ta = document.createElement('textarea');
-  ta.value = url;
-  ta.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90vw;height:80px;z-index:9999;font-size:12px;padding:8px;border:2px solid #3b82f6;border-radius:8px;';
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  setTimeout(() => document.body.removeChild(ta), 3000);
-  alert('Link copied! (also shown in the text box — long-press to copy on mobile)');
 }
 
 function loadFromURL() {
   const hash = location.hash.slice(1);
   if (!hash) return false;
   try {
-    const parsed = JSON.parse(decodeURIComponent(escape(atob(hash))));
+    const parsed = decodeToken(hash);
     if (parsed.data) {
       data.day       = parsed.data.day       ?? data.day;
       data.wbgt      = parsed.data.wbgt      ?? data.wbgt;
@@ -1355,10 +1357,11 @@ function loadFromURL() {
       data.meta      = { ...data.meta, ...(parsed.data.meta ?? {}) };
     }
     if (parsed.genRequirements) genRequirements = parsed.genRequirements;
-    history.replaceState(null, '', location.pathname); // clean URL after loading
+    // Remove hash from URL without page reload (safe on file:// too)
+    try { history.replaceState(null, '', location.pathname + location.search); } catch {}
     return true;
   } catch {
-    return false;
+    return false; // invalid / corrupted token — silently ignore
   }
 }
 
