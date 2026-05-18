@@ -128,7 +128,7 @@ let data = {
 // ═══════════════════════════════════════════════
 function uid() { return '_' + Math.random().toString(36).slice(2, 9); }
 
-const LANE_H = 42;
+const LANE_H = window.matchMedia('(pointer: coarse)').matches ? 54 : 42;
 const SILENT_STARTS = new Set(['2000', '0000', '0400', '1800']);
 function isSilentSlot(slot) { return SILENT_STARTS.has(slot.start); }
 

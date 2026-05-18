@@ -919,6 +919,44 @@ td.total-d2 { background: #fefce8; }
   .gen-table-wrap { -webkit-overflow-scrolling: touch; }
   .gen-options { flex-direction: column; gap: 10px; }
   .footer-date-input { font-size: 16px !important; padding: 10px; }
+
+  /* ── Schedule table: sticky header rows while scrolling down ── */
+  #schedule-wrapper {
+    padding: 6px 4px 4px;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100dvh - 100px);
+    -webkit-overflow-scrolling: touch;
+  }
+  #schedule-table .super-hdr th { position: sticky; top: 0;    z-index: 12; }
+  #schedule-table .hdr-top    th { position: sticky; top: 26px; z-index: 11; }
+  #schedule-table .hdr-wbgt   td { position: sticky; top: 54px; z-index: 10; }
+
+  /* ── Bigger task-bar text on mobile ── */
+  .bar-type { font-size: 12px !important; }
+  .bar-time { font-size: 10px !important; }
+
+  /* ── Name column wider for readability ── */
+  .person-row td.name-cell {
+    font-size: 12px !important;
+    padding: 4px 6px !important;
+  }
+
+  /* ── Footer: bigger rows for easy tapping ── */
+  .footer-row td { padding: 12px 10px; font-size: 13px; }
+  .footer-row.footer-flags td { font-size: 13px; }
+  .footer-row.footer-flags .footer-prowl-select { font-size: 15px !important; min-height: 44px; }
+  .footer-prowl-select { font-size: 15px !important; min-height: 44px; }
+  .strength-inp { width: 52px !important; min-height: 44px !important; font-size: 17px !important; }
+  .strength-label { font-size: 10px; }
+  .footer-date-input { min-height: 46px; font-size: 16px !important; }
+
+  /* ── Violation badge bigger tap target ── */
+  .task-violation-badge, .task-ignored-dot {
+    width: 28px; height: 28px;
+    font-size: 15px;
+    bottom: 3px; right: 3px;
+  }
 }
 
 /* ═══════════════════════════════════════════
