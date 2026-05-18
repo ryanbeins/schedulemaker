@@ -1,5 +1,5 @@
 const CACHE = 'schedulemaker-v2';
-const ASSETS = ['./home.html', './CSS/style.css', './JS/script.js', './manifest.json'];
+const ASSETS = ['./home.html', './CSS/style.css', './JS/script.js', './JS/html2canvas.min.js', './manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

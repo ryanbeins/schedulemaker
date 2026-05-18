@@ -336,7 +336,8 @@ td.total-d2 { background: #fefce8; }
   vertical-align: middle;
 }
 .footer-row b { font-weight: 700; color: #0f172a; }
-.footer-row.footer-flags td  { background: #f8faff; }
+.footer-row.footer-flags td  { background: #f8faff; font-size: 15px; }
+.footer-row.footer-flags .footer-prowl-select { font-size: 14px; min-height: 40px; padding: 9px 10px; }
 .footer-row.footer-svc   td  { background: #fafbff; border-top: 1px solid #e2e8f0; }
 .footer-row.footer-leg   td  { background: #f8fafc; color: #475569; font-size: 12px; border-top: 1px solid #e2e8f0; }
 .footer-row.footer-cl    td  { background: #f0fdf4; border-top: 2px solid #bbf7d0; padding: 10px 16px; }
@@ -564,36 +565,64 @@ td.total-d2 { background: #fefce8; }
   min-height: 36px;
 }
 
+/* Prowl dual-select layout — always horizontal */
+.prowl-selects {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 10px;
+  margin-top: 6px;
+  align-items: center;
+  flex-wrap: nowrap !important;
+  max-width: 560px;
+}
+.footer-prowl-select {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 260px;
+  padding: 8px 10px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  background: #f8fafc;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 36px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.footer-prowl-select:focus { outline: none; border-color: #3b82f6; background: #eff6ff; }
+.footer-prowl-select:hover { border-color: #93c5fd; }
+
 /* Total Strength three-field layout */
 .strength-fields {
   display: flex;
   gap: 10px;
   align-items: flex-end;
-  padding: 6px 10px;
+  padding: 4px 8px;
 }
 .strength-field {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 .strength-label {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
 .strength-inp {
-  width: 52px !important;
+  width: 56px !important;
   text-align: center !important;
-  padding: 6px 4px !important;
-  font-size: 14px !important;
+  padding: 8px 4px !important;
+  font-size: 16px !important;
   font-weight: 700 !important;
-  min-height: 36px !important;
-  border-radius: 6px;
+  min-height: 40px !important;
+  border-radius: 8px;
   border: 1.5px solid #e2e8f0 !important;
-  border-bottom-width: 2px !important;
   background: #f8fafc;
 }
 .strength-inp:focus {

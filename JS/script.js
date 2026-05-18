@@ -211,6 +211,16 @@ function totalHours(person) {
   return person.tasks.reduce((acc, t) => acc + taskDurationHrs(t), 0);
 }
 
+function calcSvcAvg() {
+  const qualifying = data.personnel.filter(p => {
+    const h = totalHours(p);
+    return h > 0 && h < 10;
+  });
+  if (!qualifying.length) return 0;
+  const sum = qualifying.reduce((acc, p) => acc + totalHours(p), 0);
+  return Math.round((sum / qualifying.length) * 100) / 100;
+}
+
 function avgHours() {
   const hrs = data.personnel.map(totalHours).filter(h => h > 0);
   if (!hrs.length) return 0;
@@ -496,6 +506,39 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
 
 }
 
+function makeProwlSelects(container, metaKey, count = 2) {
+  const parts = (data.meta[metaKey] || '').split(',').map(s => s.trim());
+
+  function buildSelect(selectedName) {
+    const sel = document.createElement('select');
+    sel.className = 'footer-prowl-select';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '— None —';
+    sel.appendChild(blank);
+    data.personnel.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.name;
+      opt.textContent = p.role ? `${p.name} (${p.role})` : p.name;
+      if (p.name === selectedName) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  const selects = Array.from({ length: count }, (_, i) => buildSelect(parts[i] || ''));
+  const save = () => {
+    data.meta[metaKey] = selects.map(s => s.value).filter(Boolean).join(',');
+    saveToStorage();
+  };
+  selects.forEach(s => s.addEventListener('change', save));
+
+  const wrap = document.createElement('div');
+  wrap.className = 'prowl-selects';
+  selects.forEach(s => wrap.appendChild(s));
+  container.appendChild(wrap);
+}
+
 function makeFooterEditable(cell, getV, setV, opts = {}) {
   cell.classList.add('footer-editable');
   const inp = document.createElement('input');
@@ -520,13 +563,12 @@ function renderFooter(tbody, constraintCache) {
   // === Flag row ===
   const flagRow = tbody.insertRow();
   flagRow.className = 'footer-row footer-flags';
-  flagRow.insertCell().colSpan = 2;
-  const fl1 = flagRow.insertCell(); fl1.colSpan = 2; fl1.innerHTML = '<b>0600 Flag:</b>';
-  const fc3 = flagRow.insertCell(); fc3.colSpan = 3;
-  makeFooterEditable(fc3, () => data.meta.flag0600, v => { data.meta.flag0600 = v; });
+  const fl1 = flagRow.insertCell(); fl1.colSpan = 1; fl1.innerHTML = '<b>0600 Flag:</b>';
+  const fc3 = flagRow.insertCell(); fc3.colSpan = 4;
+  makeProwlSelects(fc3, 'flag0600', 3);
   const fl3 = flagRow.insertCell(); fl3.colSpan = 2; fl3.innerHTML = '<b>1800 flag:</b>';
-  const fc5 = flagRow.insertCell(); fc5.colSpan = 2;
-  makeFooterEditable(fc5, () => data.meta.flag1800, v => { data.meta.flag1800 = v; });
+  const fc5 = flagRow.insertCell(); fc5.colSpan = 4;
+  makeProwlSelects(fc5, 'flag1800', 3);
 
   // === Prowl row ===
   const prowlRow = tbody.insertRow();
@@ -542,17 +584,9 @@ function renderFooter(tbody, constraintCache) {
   dateInput.onchange = () => { data.meta.date = dateInput.value; saveToStorage(); };
   cbCell.appendChild(dateInput);
 
-  const pr2 = prowlRow.insertCell(); pr2.colSpan = 2;
-  pr2.innerHTML = '<b>Morning Prowl:</b>';
-  const prowlInp = document.createElement('input');
-  prowlInp.type = 'text';
-  prowlInp.value = data.meta.prowl;
-  prowlInp.className = 'footer-editable-input inline';
-  prowlInp.addEventListener('blur', () => { data.meta.prowl = prowlInp.value.trim(); saveToStorage(); });
-  prowlInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); prowlInp.blur(); } });
-  pr2.appendChild(prowlInp);
-
-  prowlRow.insertCell().colSpan = 1;
+  const pr2 = prowlRow.insertCell(); pr2.colSpan = 3;
+  pr2.innerHTML = '<b>Morning Prowl:</b><br>';
+  makeProwlSelects(pr2, 'prowl');
   const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength</b>';
   const pr6 = prowlRow.insertCell(); pr6.colSpan = 3;
 
@@ -598,15 +632,15 @@ function renderFooter(tbody, constraintCache) {
   nightProwlRow1.className = 'footer-row';
   nightProwlRow1.insertCell().colSpan = 2;
   const np1 = nightProwlRow1.insertCell(); np1.colSpan = 9;
-  np1.innerHTML = '<b>1st Night Prowl:</b> ';
-  makeInlineEditable(np1, 'nightProwl1');
+  np1.innerHTML = '<b>1st Night Prowl:</b><br>';
+  makeProwlSelects(np1, 'nightProwl1');
 
   const nightProwlRow2 = tbody.insertRow();
   nightProwlRow2.className = 'footer-row';
   nightProwlRow2.insertCell().colSpan = 2;
   const np2 = nightProwlRow2.insertCell(); np2.colSpan = 9;
-  np2.innerHTML = '<b>2nd Night Prowl:</b> ';
-  makeInlineEditable(np2, 'nightProwl2');
+  np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
+  makeProwlSelects(np2, 'nightProwl2');
 
   tbody.insertRow().insertCell().colSpan = 11;
 
@@ -618,8 +652,10 @@ function renderFooter(tbody, constraintCache) {
   svc2.innerHTML = '<b>Service Avg Mounting hrs</b>';
   svc2.style.textAlign = 'right';
   const svc3 = svcRow.insertCell(); svc3.colSpan = 2;
-  makeFooterEditable(svc3, () => String(data.meta.svcAvg), v => { data.meta.svcAvg = parseFloat(v) || 0; }, { textAlign: 'center', inputMode: 'decimal' });
-  svc3.style.textAlign = 'center';
+  const computedAvg = calcSvcAvg();
+  data.meta.svcAvg = computedAvg;
+  svc3.textContent = computedAvg > 0 ? computedAvg.toFixed(2) + ' hrs' : '—';
+  svc3.style.cssText = 'text-align:center;font-weight:700;font-size:14px;color:#1d4ed8';
   svcRow.insertCell().colSpan = 2;
 
 

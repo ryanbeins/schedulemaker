@@ -209,10 +209,19 @@
     <!-- Drag time tooltip -->
     <div id="drag-tooltip"></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- html2canvas: local copy first, CDN fallback -->
+    <script src="JS/html2canvas.min.js"></script>
+    <script>
+      if (typeof html2canvas === 'undefined') {
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        document.head.appendChild(s);
+      }
+    </script>
     <script src="JS/script.js"></script>
     <script>
-      if ('serviceWorker' in navigator) {
+      // Service worker only works over HTTP/HTTPS, not file://
+      if ('serviceWorker' in navigator && location.protocol !== 'file:') {
         window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
       }
     </script>
