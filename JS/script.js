@@ -118,7 +118,7 @@ let data = {
   meta: {
     flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
     prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
-    strength: '02 / 06 / 02', svcAvg: 4.5, notes: [],
+    strength: '02 / 06 / 02', svcAvg: 4.5, notes: [], ignoredViolations: [],
     date: new Date().toISOString().slice(0, 10),
   },
 };
@@ -487,12 +487,34 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     bar.appendChild(rh);
 
     // Violation badge if task > 3 hrs
-    if (taskDurationHrs(task) > 3.0001) {
+    const ignored = (data.meta.ignoredViolations || []).includes(task.id);
+    if (taskDurationHrs(task) > 3.0001 && !ignored) {
       bar.classList.add('task-violation');
       const badge = document.createElement('span');
       badge.className = 'task-violation-badge';
       badge.textContent = '⚠';
+      badge.title = 'Double-click to ignore this alert';
+      badge.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        if (!data.meta.ignoredViolations) data.meta.ignoredViolations = [];
+        data.meta.ignoredViolations.push(task.id);
+        saveToStorage();
+        render();
+      });
       bar.appendChild(badge);
+    } else if (ignored && taskDurationHrs(task) > 3.0001) {
+      // Show a muted "ignored" dot so user knows it was suppressed
+      const dot = document.createElement('span');
+      dot.className = 'task-ignored-dot';
+      dot.title = 'Violation ignored (manpower shortage) — double-click to restore';
+      dot.textContent = '✓';
+      dot.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        data.meta.ignoredViolations = (data.meta.ignoredViolations || []).filter(id => id !== task.id);
+        saveToStorage();
+        render();
+      });
+      bar.appendChild(dot);
     }
 
     timeCell.appendChild(bar);
@@ -507,12 +529,7 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
   const hrs    = totalHours(person);
   const d2Cell = row.insertCell();
   d2Cell.className = 'total-cell total-d2';
-  if (issues.length > 0) {
-    d2Cell.classList.add('violation-cell');
-    d2Cell.innerHTML = `<span>${hrs > 0 ? hrs.toFixed(2) : '—'}</span><span class="violation-exclaim">⚠</span>`;
-  } else {
-    d2Cell.textContent = hrs > 0 ? hrs.toFixed(2) : '';
-  }
+  d2Cell.textContent = hrs > 0 ? hrs.toFixed(2) : '';
   if (hrs > avg * 3) {
     d2Cell.classList.add('over-avg');
     d2Cell.title = '* Hours exceeded avg by >3×';
