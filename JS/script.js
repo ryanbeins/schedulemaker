@@ -16,15 +16,15 @@ const TOTAL_MINS     = 24 * 60;
 const DAY_START_MINS = 20 * 60;
 
 const TASK_COLORS = {
-  'Sentry': '#f44336', 'PAC': '#00e5ff', 'VAC': '#00e676',
+  'Sentry': '#f44336', 'PAC': '#00e5ff', 'VAC': '#00e676', 'PO': '#ff9800',
   'ND': '#ffd54f', 'SIGC': '#ffd54f', 'GC/PO': '#ce93d8',
   'VAC/PAC': '#00e676', 'Custom': '#90caf9',
 };
 
 const GROUP_ALLOWED_TASKS = {
-  kah:        ['GC/PO', 'Sentry', 'PAC', 'VAC', 'VAC/PAC', 'Custom'],
-  combatants: ['Sentry', 'PAC', 'VAC', 'VAC/PAC', 'Custom'],
-  service:    ['PAC', 'VAC', 'VAC/PAC', 'Custom'],
+  kah:        ['GC/PO', 'Sentry', 'PAC', 'VAC', 'PO', 'VAC/PAC', 'Custom'],
+  combatants: ['Sentry', 'PAC', 'VAC', 'PO', 'VAC/PAC', 'Custom'],
+  service:    ['PAC', 'VAC', 'PO', 'VAC/PAC', 'Custom'],
   night:      ['ND', 'SIGC', 'PAC', 'Custom'],
 };
 
@@ -50,78 +50,145 @@ const WBGT_CLASSES = {
   'YELLOW': 'wbgt-yellow', 'BLACK': 'wbgt-black',
 };
 
-let data = {
-  day: 1,
-  wbgt: {
-    '2000': 'WHITE', '0000': 'WHITE', '0400': 'WHITE',
-    '0800': 'WHITE', '1000': 'GREEN', '1200': 'RED',
-    '1400': 'YELLOW', '1600': 'WHITE', '1800': 'WHITE',
-  },
-  groups: [
+// ── Multi-day schedule storage ──
+// Each day (1/2/3) owns an independent wbgt/groups/personnel/meta set.
+// `data` always points at the currently active day's objects (by reference,
+// so in-place mutations of data.personnel/etc. write straight through to allDays).
+function defaultGroups() {
+  return [
     { id: 'kah',        label: 'KEY APPOINTMENT HOLDERS (KAH)' },
     { id: 'combatants', label: 'COMBATANTS (DAY)' },
     { id: 'service',    label: 'SERVICE (DAY)' },
     { id: 'night',      label: 'NIGHT DUTY' },
-  ],
-  personnel: [
-    { id: uid(), name: 'Keene', role: 'GC', group: 'kah',
-      tasks: [{ id: uid(), type: 'GC/PO', label: 'GC/PO', start: '0800', end: '2000', color: '#ce93d8' }] },
-    { id: uid(), name: 'Adlan', role: 'C1', group: 'combatants',
-      tasks: [
-        { id: uid(), type: 'Sentry', label: 'Sentry 0700-0900', start: '0700', end: '0900', color: '#f44336' },
-        { id: uid(), type: 'Sentry', label: 'Sentry 1100-1300', start: '1100', end: '1300', color: '#f44336' },
-        { id: uid(), type: 'PAC',    label: 'PAC 1400-1600',    start: '1400', end: '1600', color: '#00e5ff' },
-      ]},
-    { id: uid(), name: 'Haziq', role: 'C2', group: 'combatants',
-      tasks: [
-        { id: uid(), type: 'PAC',     label: 'PAC 0900-1000',        start: '0900', end: '1000', color: '#00e5ff' },
-        { id: uid(), type: 'VAC',     label: 'VAC 1000-1100',        start: '1000', end: '1100', color: '#00e676' },
-        { id: uid(), type: 'VAC',     label: 'VAC 1600-1800',        start: '1600', end: '1800', color: '#00e676' },
-        { id: uid(), type: 'VAC/PAC', label: 'VAC/PAC till secured', start: '1800', end: '2000', color: '#00e676' },
-      ]},
-    { id: uid(), name: 'Aidan', role: 'C3', group: 'combatants',
-      tasks: [
-        { id: uid(), type: 'VAC',    label: 'VAC 0900-1000',    start: '0900', end: '1000', color: '#00e676' },
-        { id: uid(), type: 'PAC',    label: 'PAC 1000-1100',    start: '1000', end: '1100', color: '#00e5ff' },
-        { id: uid(), type: 'Sentry', label: 'Sentry 1300-1600', start: '1300', end: '1600', color: '#f44336' },
-      ]},
-    { id: uid(), name: 'Ivan', role: 'C4', group: 'combatants',
-      tasks: [
-        { id: uid(), type: 'PAC',    label: 'PAC 0800-0900',    start: '0800', end: '0900', color: '#00e5ff' },
-        { id: uid(), type: 'Sentry', label: 'Sentry 0900-1100', start: '0900', end: '1100', color: '#f44336' },
-        { id: uid(), type: 'PAC',    label: 'PAC 1100-1200',    start: '1100', end: '1200', color: '#00e5ff' },
-        { id: uid(), type: 'Sentry', label: 'Sentry 1600-1800', start: '1600', end: '1800', color: '#f44336' },
-      ]},
-    { id: uid(), name: 'Ralph', role: 'S1', group: 'service',
-      tasks: [
-        { id: uid(), type: 'VAC', label: 'VAC 1100-1400', start: '1100', end: '1400', color: '#00e676' },
-      ]},
-    { id: uid(), name: 'Sahil', role: 'S2', group: 'service',
-      tasks: [
-        { id: uid(), type: 'VAC', label: 'VAC 0700-0900', start: '0700', end: '0900', color: '#00e676' },
-        { id: uid(), type: 'PAC', label: 'PAC 1200-1400', start: '1200', end: '1400', color: '#00e5ff' },
-        { id: uid(), type: 'VAC', label: 'VAC 1400-1600', start: '1400', end: '1600', color: '#00e676' },
-      ]},
-    { id: uid(), name: 'Thaqris', role: 'N1', group: 'night',
-      tasks: [
-        { id: uid(), type: 'ND', label: 'ND (2000 - 0200)', start: '2000', end: '0200', color: '#ffd54f' },
-      ]},
-    { id: uid(), name: 'Ryan', role: 'GC', group: 'night',
-      tasks: [
-        { id: uid(), type: 'SIGC', label: 'SIGC (2000 - 0800)', start: '2000', end: '0800', color: '#ffd54f' },
-      ]},
-    { id: uid(), name: 'Danish', role: 'N3', group: 'night',
-      tasks: [
-        { id: uid(), type: 'ND', label: 'ND (0200-0800)', start: '0200', end: '0800', color: '#ffd54f' },
-      ]},
-  ],
-  meta: {
-    flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
-    prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
-    strength: '02 / 06 / 02', svcAvg: 4.5, notes: [], ignoredViolations: [],
-    date: new Date().toISOString().slice(0, 10),
-  },
+  ];
+}
+
+function defaultWBGT() {
+  return {
+    '2000': 'WHITE', '0000': 'WHITE', '0400': 'WHITE',
+    '0800': 'WHITE', '1000': 'GREEN', '1200': 'RED',
+    '1400': 'YELLOW', '1600': 'WHITE', '1800': 'WHITE',
+  };
+}
+
+const PERSONNEL_TEMPLATE = [
+  { name: 'Keene',   role: 'GC', group: 'kah' },
+  { name: 'Adlan',   role: 'C1', group: 'combatants' },
+  { name: 'Haziq',   role: 'C2', group: 'combatants' },
+  { name: 'Aidan',   role: 'C3', group: 'combatants' },
+  { name: 'Ivan',    role: 'C4', group: 'combatants' },
+  { name: 'Ralph',   role: 'S1', group: 'service' },
+  { name: 'Sahil',   role: 'S2', group: 'service' },
+  { name: 'Thaqris', role: 'N1', group: 'night' },
+  { name: 'Ryan',    role: 'GC', group: 'night' },
+  { name: 'Danish',  role: 'N3', group: 'night' },
+];
+
+function defaultMeta(dateOffsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + dateOffsetDays);
+  return {
+    flag0600: '', flag1800: '',
+    prowl: '', nightProwl1: '', nightProwl2: '',
+    strength: '00 / 00 / 00', svcAvg: 0, notes: [], ignoredViolations: [],
+    date: d.toISOString().slice(0, 10),
+  };
+}
+
+// Blank day: same personnel roster, no tasks yet
+function blankDay(dayNum) {
+  return {
+    wbgt: defaultWBGT(),
+    groups: defaultGroups(),
+    personnel: PERSONNEL_TEMPLATE.map(p => ({ id: uid(), name: p.name, role: p.role, group: p.group, tasks: [] })),
+    meta: defaultMeta(dayNum - 1),
+  };
+}
+
+// Day 1 ships with a filled-in demo schedule
+function demoDay1() {
+  return {
+    wbgt: defaultWBGT(),
+    groups: defaultGroups(),
+    personnel: [
+      { id: uid(), name: 'Keene', role: 'GC', group: 'kah',
+        tasks: [{ id: uid(), type: 'GC/PO', label: 'GC/PO', start: '0800', end: '2000', color: '#ce93d8' }] },
+      { id: uid(), name: 'Adlan', role: 'C1', group: 'combatants',
+        tasks: [
+          { id: uid(), type: 'Sentry', label: 'Sentry 0700-0900', start: '0700', end: '0900', color: '#f44336' },
+          { id: uid(), type: 'Sentry', label: 'Sentry 1100-1300', start: '1100', end: '1300', color: '#f44336' },
+          { id: uid(), type: 'PAC',    label: 'PAC 1400-1600',    start: '1400', end: '1600', color: '#00e5ff' },
+        ]},
+      { id: uid(), name: 'Haziq', role: 'C2', group: 'combatants',
+        tasks: [
+          { id: uid(), type: 'PAC',     label: 'PAC 0900-1000',        start: '0900', end: '1000', color: '#00e5ff' },
+          { id: uid(), type: 'VAC',     label: 'VAC 1000-1100',        start: '1000', end: '1100', color: '#00e676' },
+          { id: uid(), type: 'VAC',     label: 'VAC 1600-1800',        start: '1600', end: '1800', color: '#00e676' },
+          { id: uid(), type: 'VAC/PAC', label: 'VAC/PAC till secured', start: '1800', end: '2000', color: '#00e676' },
+        ]},
+      { id: uid(), name: 'Aidan', role: 'C3', group: 'combatants',
+        tasks: [
+          { id: uid(), type: 'VAC',    label: 'VAC 0900-1000',    start: '0900', end: '1000', color: '#00e676' },
+          { id: uid(), type: 'PAC',    label: 'PAC 1000-1100',    start: '1000', end: '1100', color: '#00e5ff' },
+          { id: uid(), type: 'Sentry', label: 'Sentry 1300-1600', start: '1300', end: '1600', color: '#f44336' },
+        ]},
+      { id: uid(), name: 'Ivan', role: 'C4', group: 'combatants',
+        tasks: [
+          { id: uid(), type: 'PAC',    label: 'PAC 0800-0900',    start: '0800', end: '0900', color: '#00e5ff' },
+          { id: uid(), type: 'Sentry', label: 'Sentry 0900-1100', start: '0900', end: '1100', color: '#f44336' },
+          { id: uid(), type: 'PAC',    label: 'PAC 1100-1200',    start: '1100', end: '1200', color: '#00e5ff' },
+          { id: uid(), type: 'Sentry', label: 'Sentry 1600-1800', start: '1600', end: '1800', color: '#f44336' },
+        ]},
+      { id: uid(), name: 'Ralph', role: 'S1', group: 'service',
+        tasks: [
+          { id: uid(), type: 'VAC', label: 'VAC 1100-1400', start: '1100', end: '1400', color: '#00e676' },
+        ]},
+      { id: uid(), name: 'Sahil', role: 'S2', group: 'service',
+        tasks: [
+          { id: uid(), type: 'VAC', label: 'VAC 0700-0900', start: '0700', end: '0900', color: '#00e676' },
+          { id: uid(), type: 'PAC', label: 'PAC 1200-1400', start: '1200', end: '1400', color: '#00e5ff' },
+          { id: uid(), type: 'VAC', label: 'VAC 1400-1600', start: '1400', end: '1600', color: '#00e676' },
+        ]},
+      { id: uid(), name: 'Thaqris', role: 'N1', group: 'night',
+        tasks: [
+          { id: uid(), type: 'ND', label: 'ND (2000 - 0200)', start: '2000', end: '0200', color: '#ffd54f' },
+        ]},
+      { id: uid(), name: 'Ryan', role: 'GC', group: 'night',
+        tasks: [
+          { id: uid(), type: 'SIGC', label: 'SIGC (2000 - 0800)', start: '2000', end: '0800', color: '#ffd54f' },
+        ]},
+      { id: uid(), name: 'Danish', role: 'N3', group: 'night',
+        tasks: [
+          { id: uid(), type: 'ND', label: 'ND (0200-0800)', start: '0200', end: '0800', color: '#ffd54f' },
+        ]},
+    ],
+    meta: {
+      flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
+      prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
+      strength: '02 / 06 / 02', svcAvg: 4.5, notes: [], ignoredViolations: [],
+      date: new Date().toISOString().slice(0, 10),
+    },
+  };
+}
+
+let allDays = {
+  1: demoDay1(),
+  2: blankDay(2),
+  3: blankDay(3),
 };
+
+let data = { day: 1 };
+
+// Point data.wbgt/groups/personnel/meta at the given day's objects
+function applyDayPointers(day) {
+  const d = allDays[day];
+  data.day       = day;
+  data.wbgt      = d.wbgt;
+  data.groups    = d.groups;
+  data.personnel = d.personnel;
+  data.meta      = d.meta;
+}
+applyDayPointers(1);
 
 // ═══════════════════════════════════════════════
 //  UTILITIES
@@ -445,8 +512,12 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     typeSpan.textContent = task.type === 'Custom' ? (task.label || 'Custom') : task.type;
 
     const timeSpan = document.createElement('span');
-    timeSpan.className   = 'bar-time';
-    timeSpan.textContent = task.start + '–' + task.end;
+    timeSpan.className = 'bar-time';
+    // PAC/VAC/PO (and the combined VAC/PAC type) running to end-of-day read
+    // as "till secured" instead of showing the clock times.
+    const tillSecured = task.type === 'VAC/PAC'
+      || (['PAC', 'VAC', 'PO'].includes(task.type) && task.end === '2000');
+    timeSpan.textContent = tillSecured ? 'till secured' : task.start + '–' + task.end;
 
     bar.appendChild(typeSpan);
     bar.appendChild(timeSpan);
@@ -558,7 +629,16 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
 
 }
 
-function makeProwlSelects(container, metaKey, count = 2) {
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeProwlSelects(container, metaKey, count = 2, opts = {}) {
   const parts = (data.meta[metaKey] || '').split(',').map(s => s.trim());
 
   function buildSelect(selectedName) {
@@ -588,6 +668,22 @@ function makeProwlSelects(container, metaKey, count = 2) {
   const wrap = document.createElement('div');
   wrap.className = 'prowl-selects';
   selects.forEach(s => wrap.appendChild(s));
+
+  if (opts.randomize) {
+    const rngBtn = document.createElement('button');
+    rngBtn.type = 'button';
+    rngBtn.className = 'prowl-rng-btn';
+    rngBtn.title = 'Pick randomly';
+    rngBtn.setAttribute('aria-label', 'Randomize');
+    rngBtn.textContent = '🎲';
+    rngBtn.onclick = () => {
+      const picks = shuffleArray(data.personnel).slice(0, count).map(p => p.name);
+      selects.forEach((s, i) => { s.value = picks[i] || ''; });
+      save();
+    };
+    wrap.appendChild(rngBtn);
+  }
+
   container.appendChild(wrap);
 }
 
@@ -618,13 +714,13 @@ function renderFooter(tbody, constraintCache) {
   // 0600 Flag: label cell + selects cell (same pattern as 1800 flag)
   const fl1 = flagRow.insertCell(); fl1.colSpan = 1; fl1.innerHTML = '<b>0600 Flag:</b>'; fl1.style.textAlign = 'right';
   const fc3 = flagRow.insertCell(); fc3.colSpan = 4;
-  makeProwlSelects(fc3, 'flag0600', 3);
+  makeProwlSelects(fc3, 'flag0600', 3, { randomize: true });
   // 1800 flag: label right-aligned, selects next cell
   const fl3 = flagRow.insertCell(); fl3.colSpan = 2;
   fl3.innerHTML = '<b>1800 flag:</b>';
   fl3.style.textAlign = 'right';
   const fc5 = flagRow.insertCell(); fc5.colSpan = 4;
-  makeProwlSelects(fc5, 'flag1800', 3);
+  makeProwlSelects(fc5, 'flag1800', 3, { randomize: true });
 
   // === Prowl row ===
   const prowlRow = tbody.insertRow();
@@ -777,7 +873,11 @@ function savePerson() {
 
 function deletePerson() {
   if (!confirm('Delete this person and all their tasks?')) return;
-  data.personnel = data.personnel.filter(x => x.id !== _editPersonId);
+  // Mutate the array in place (not reassign) so it stays the same object
+  // referenced by allDays[day].personnel — keeps this day's data isolated
+  // from the other two days.
+  const idx = data.personnel.findIndex(x => x.id === _editPersonId);
+  if (idx !== -1) data.personnel.splice(idx, 1);
   closeModal('modal-person');
   render();
 }
@@ -910,77 +1010,345 @@ function saveMeta() {
   render();
 }
 
-function setDay(v) { data.day = parseInt(v) || 1; render(); }
-
-// ═══════════════════════════════════════════════
-//  SCHEDULE GENERATOR
-// ═══════════════════════════════════════════════
-let genRequirements = [
-  { type: 'Sentry', start: '0700', end: '1900', shiftHours: 2, group: 'combatants', color: '#f44336' },
-  { type: 'PAC',    start: '0800', end: '1800', shiftHours: 1, group: 'combatants', color: '#00e5ff' },
-  { type: 'VAC',    start: '0700', end: '1700', shiftHours: 2, group: 'service',    color: '#00e676' },
-  { type: 'ND',     start: '2000', end: '0400', shiftHours: 4, group: 'night',      color: '#ffd54f' },
-  { type: 'SIGC',   start: '2000', end: '0800', shiftHours: 8, group: 'night',      color: '#ffd54f' },
-];
-
-function openGeneratorModal() {
-  renderGenRows();
-  document.getElementById('gen-result').style.display = 'none';
-  openModal('modal-generator');
+function setDay(v) {
+  applyDayPointers(parseInt(v) || 1);
+  updateDayTabsUI();
+  render();
 }
 
-function renderGenRows() {
-  const tbody = document.getElementById('gen-req-body');
-  tbody.innerHTML = '';
-  genRequirements.forEach((req, idx) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>
-        <select onchange="genRequirements[${idx}].type=this.value;genRequirements[${idx}].color=taskColor(null,this.value);renderGenRows()">
-          ${['Sentry','PAC','VAC','ND','SIGC','GC/PO','VAC/PAC','Custom'].map(t =>
-            `<option value="${t}" ${req.type===t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </td>
-      <td><input type="text" maxlength="4" value="${req.start}" oninput="genRequirements[${idx}].start=this.value.padStart(4,'0')" placeholder="HHMM"></td>
-      <td><input type="text" maxlength="4" value="${req.end}"   oninput="genRequirements[${idx}].end=this.value.padStart(4,'0')"   placeholder="HHMM"></td>
-      <td><input type="number" min="0.5" max="3" step="0.5" value="${req.shiftHours}" oninput="genRequirements[${idx}].shiftHours=parseFloat(this.value)||1" style="width:60px"></td>
-      <td>
-        <select onchange="genRequirements[${idx}].group=this.value">
-          ${data.groups.map(g =>
-            `<option value="${g.id}" ${req.group===g.id?'selected':''}>${g.label}</option>`).join('')}
-        </select>
-      </td>
-      <td style="text-align:center"><input type="color" value="${taskColor(req.color, req.type)}" oninput="genRequirements[${idx}].color=this.value"></td>
-      <td><button class="gen-del-btn" onclick="removeGenRow(${idx})">×</button></td>
-    `;
-    tbody.appendChild(tr);
+function updateDayTabsUI() {
+  document.querySelectorAll('.day-tab').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.day, 10) === data.day);
   });
 }
 
-function addGenRow() {
-  genRequirements.push({ type: 'Sentry', start: '0800', end: '1000', shiftHours: 2, group: 'combatants', color: '#f44336' });
-  renderGenRows();
+// Wipe all assigned tasks for the active day only, so its personnel/WBGT
+// setup stays put but the schedule itself starts blank again.
+function clearDay() {
+  if (!confirm(`Clear all tasks for Day ${data.day}? This cannot be undone.`)) return;
+  data.personnel.forEach(p => { p.tasks = []; });
+  data.meta.ignoredViolations = [];
+  render();
 }
 
-function removeGenRow(idx) {
-  genRequirements.splice(idx, 1);
-  renderGenRows();
+// ═══════════════════════════════════════════════
+//  AUTO-GENERATE (Combatants & Service)
+// ═══════════════════════════════════════════════
+// Max out every shift at the app's 3hr cap — e.g. Sentry runs a full 3hrs
+// before rotating to someone else, rather than short 2hr blocks.
+const AUTOGEN_SHIFT_HOURS = 3;
+
+// Each duty type's allowed clock-time window. Generated shifts are clipped
+// to these — e.g. Sentry never gets scheduled past 1800.
+const TASK_WINDOWS = {
+  Sentry: { start: '0700', end: '1800' },
+  PAC:    { start: '0800', end: '2000' },
+  PO:     { start: '0800', end: '2000' },
+  VAC:    { start: '0700', end: '2000' },
+};
+
+// The 4 posts that must be staffed every hour they're in-window. Sentry is
+// listed first because it's the scarcest (Combatants-only) — filling it
+// first each hour keeps a Combatant in reserve for the next Sentry rotation
+// instead of the greedy loop accidentally using all 4 up on other duties.
+const AUTOGEN_TYPES = ['Sentry', 'PAC', 'VAC', 'PO'];
+
+// Hourly checkpoints across the full 0700–2000 span — every hour within a
+// duty's window is checked for coverage and (re)filled if nobody's on post.
+const AUTOGEN_HOURS = ['0700','0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900'];
+
+// Each person can flag which part of the day they'd rather work — up to 2 of
+// Morning/Afternoon/Evening, or "Anything" if they're fully flexible. It's a
+// soft preference: the generator tries to honor it but will still use
+// someone outside their preferred time if that's the only way to keep a
+// post covered.
+const AUTOGEN_TIME_OPTIONS = ['anything', 'morning', 'afternoon', 'evening'];
+
+function ensureTimePref(person) {
+  if (!Array.isArray(person.timePref)) person.timePref = [];
+  return person.timePref;
 }
 
-function breakIntoShifts(start, end, shiftHours) {
-  const shifts    = [];
-  const shiftMins = Math.round(shiftHours * 60);
-  let cur  = timeToMins(start);
-  let endM = timeToMins(end);
-  if (endM <= cur) endM += TOTAL_MINS;
-  while (cur < endM) {
-    const next = Math.min(cur + shiftMins, endM);
-    shifts.push({ start: minsToTime(cur), end: minsToTime(next % TOTAL_MINS) });
-    cur = next;
+// No preference set, or "Anything" picked, means they're open to any period.
+function autogenMatchesTimePref(person, periodKey) {
+  const pref = ensureTimePref(person);
+  return pref.length === 0 || pref.includes('anything') || pref.includes(periodKey);
+}
+
+function toggleTimePref(personId, option) {
+  const person = data.personnel.find(p => p.id === personId);
+  if (!person) return;
+  const pref = ensureTimePref(person);
+  const idx  = pref.indexOf(option);
+
+  if (option === 'anything') {
+    person.timePref = idx === -1 ? ['anything'] : [];
+  } else if (idx !== -1) {
+    pref.splice(idx, 1);
+  } else {
+    const specific = pref.filter(p => p !== 'anything');
+    if (specific.length < 2) person.timePref = [...specific, option];
+    // else: already at the 2-preference cap — fall through to re-render,
+    // which resets this checkbox back to unchecked since nothing changed.
   }
-  return shifts;
+  renderAutogenRows();
 }
 
+function hhmmToMinutesOfDay(t) {
+  const s = String(t).padStart(4, '0');
+  return parseInt(s.slice(0, 2), 10) * 60 + parseInt(s.slice(2, 4), 10);
+}
+function minutesOfDayToHHMM(m) {
+  return String(Math.floor(m / 60)).padStart(2, '0') + String(m % 60).padStart(2, '0');
+}
+function hourPlus(h, n) {
+  return minutesOfDayToHHMM(hhmmToMinutesOfDay(h) + n * 60);
+}
+
+// PAC/VAC/PO shifts that run to the end of the day (2000) are labeled
+// "till secured" instead of showing the clock times.
+function autogenLabel(type, shift) {
+  if (['PAC', 'VAC', 'PO'].includes(type) && shift.end === '2000') {
+    return `${type} till secured`;
+  }
+  return `${type} ${shift.start}-${shift.end}`;
+}
+
+function autogenPeriodForHour(h) {
+  const mins = hhmmToMinutesOfDay(h);
+  if (mins < hhmmToMinutesOfDay('1200')) return 'morning';
+  if (mins < hhmmToMinutesOfDay('1600')) return 'afternoon';
+  return 'evening';
+}
+
+// Sentry can only go to Combatants; the other 3 posts can go to either.
+function autogenEligiblePool(type) {
+  return type === 'Sentry'
+    ? data.personnel.filter(p => p.group === 'combatants')
+    : data.personnel.filter(p => p.group === 'combatants' || p.group === 'service');
+}
+
+function autogenHasServedType(person, type) {
+  return person.tasks.some(t => t.type === type);
+}
+
+// Is anyone already covering `type` at hour `h`? Checked directly against
+// everyone's actual tasks (rather than a single running "covered until"
+// timestamp) so it stays correct even when coverage comes from more than one
+// place — e.g. Phase 1B's Service VAC turns plus Phase 2's general fill.
+function autogenIsHourCovered(type, h) {
+  const hm = hhmmToMinutesOfDay(h);
+  return data.personnel.some(p =>
+    (p.group === 'combatants' || p.group === 'service') &&
+    p.tasks.some(t => t.type === type && hhmmToMinutesOfDay(t.start) <= hm && hm < hhmmToMinutesOfDay(t.end))
+  );
+}
+
+// Round-robin cursor per duty type, so that when candidates are otherwise
+// perfectly tied, the post rotates to a different person each time instead
+// of always defaulting back to whoever's first in the roster (which is what
+// caused some people to get picked for the same post repeatedly while
+// others never got a turn).
+let autogenRotationCursor = { PAC: 0, VAC: 0, PO: 0 };
+
+// Ranks candidates for one of the 3 shared posts (PAC/VAC/PO — Sentry's
+// rotation is decided separately, up front). Whoever's stated time
+// preference covers this period goes first; ties then go to fewest hours
+// worked, then the round-robin cursor.
+function autogenCompare(periodKey, cursor, pool) {
+  return (a, b) => {
+    const aMatch = autogenMatchesTimePref(a, periodKey) ? 0 : 1;
+    const bMatch = autogenMatchesTimePref(b, periodKey) ? 0 : 1;
+    if (aMatch !== bMatch) return aMatch - bMatch;
+    const hoursDiff = totalHours(a) - totalHours(b);
+    if (hoursDiff !== 0) return hoursDiff;
+    const ia = pool.indexOf(a), ib = pool.indexOf(b);
+    return ((ia - cursor + pool.length) % pool.length) - ((ib - cursor + pool.length) % pool.length);
+  };
+}
+
+// Finds who should cover `type` starting at hour `h`. Tries the best-ranked
+// candidate at the fullest legal shift length first, then shrinks that same
+// candidate's shift down (to as little as 1hr) before moving on to the next
+// candidate — this is what lets someone plug a post even when their day is
+// otherwise tightly booked around their own Sentry commitment, instead of
+// leaving a gap.
+function autogenFillPost(type, h, periodKey) {
+  const win     = TASK_WINDOWS[type];
+  const maxEnd  = hourPlus(h, AUTOGEN_SHIFT_HOURS);
+  const fullEnd = hhmmToMinutesOfDay(maxEnd) > hhmmToMinutesOfDay(win.end) ? win.end : maxEnd;
+
+  const pool    = autogenEligiblePool(type);
+  const cursor  = autogenRotationCursor[type];
+  const ordered = [...pool].sort(autogenCompare(periodKey, cursor, pool));
+
+  for (const person of ordered) {
+    let end = fullEnd;
+    while (hhmmToMinutesOfDay(end) > hhmmToMinutesOfDay(h)) {
+      if (canAssign(person, h, end)) {
+        autogenRotationCursor[type] = (pool.indexOf(person) + 1) % pool.length;
+        return { person, end };
+      }
+      end = hourPlus(end, -1);
+    }
+  }
+  return null;
+}
+
+// If idlest can't take a donor's whole shift, checks every possible hour-
+// aligned slice of it (largest first) to see if any fits their calendar —
+// not just the head or tail, since the one gap in idlest's day might sit
+// right in the middle of the donor's block (blocked on both sides by
+// idlest's own other tasks). Returns the slice to give away plus whatever
+// the donor keeps before/after it (either piece may be empty), or null if
+// no slice of that shift works.
+function autogenPartialMove(idlest, task) {
+  const startMin = hhmmToMinutesOfDay(task.start);
+  const endMin   = hhmmToMinutesOfDay(task.end);
+
+  for (let takeLen = Math.floor((endMin - startMin) / 60) - 1; takeLen >= 1; takeLen--) {
+    for (let ws = startMin; ws + takeLen * 60 <= endMin; ws += 60) {
+      const we = ws + takeLen * 60;
+      const giveStart = minutesOfDayToHHMM(ws);
+      const giveEnd   = minutesOfDayToHHMM(we);
+      if (canAssign(idlest, giveStart, giveEnd)) {
+        return {
+          giveStart, giveEnd,
+          headStart: task.start, headEnd: giveStart,
+          tailStart: giveEnd,    tailEnd: task.end,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+// Evens out total hours after the fact by handing already-scheduled work
+// from busier people to the least-busy person — never removes coverage, so
+// it can only rebalance workload, never reopen a gap. Sentry shifts are
+// never touched, since the main pass already worked hard to make sure every
+// Combatant gets one and this shouldn't be allowed to undo that. Tries a
+// whole-shift handoff first; if nobody's whole shift fits the idlest
+// person's calendar, falls back to trimming just part of one over to them
+// (e.g. someone whose day is otherwise fully booked can often still take a
+// 1hr sliver off the edge of someone else's block). Stops once everyone's
+// within ~2hrs of each other, or once no more safe handoffs exist anywhere.
+function autogenRebalance() {
+  const pool = data.personnel.filter(p => p.group === 'combatants' || p.group === 'service');
+  if (pool.length < 2) return;
+
+  for (let i = 0; i < pool.length * 12; i++) {
+    const idlest = pool.reduce((a, b) => (totalHours(b) < totalHours(a) ? b : a));
+    const busiestGap = Math.max(...pool.map(p => totalHours(p))) - totalHours(idlest);
+    if (busiestGap < 2) break;
+
+    const donors = [...pool].filter(p => p !== idlest).sort((a, b) => totalHours(b) - totalHours(a));
+    let moved = false;
+
+    for (const donor of donors) {
+      const movable = donor.tasks.find(t =>
+        t.type !== 'Sentry' && !t.guaranteed &&
+        canAssign(idlest, t.start, t.end) &&
+        totalHours(idlest) + taskDurationHrs(t) < totalHours(donor)
+      );
+      if (!movable) continue;
+      donor.tasks = donor.tasks.filter(t => t.id !== movable.id);
+      idlest.tasks.push(movable);
+      moved = true;
+      break;
+    }
+
+    if (!moved) {
+      outer:
+      for (const donor of donors) {
+        for (const t of donor.tasks) {
+          if (t.type === 'Sentry') continue;
+          const split = autogenPartialMove(idlest, t);
+          if (!split) continue;
+          const givenHrs = taskDurationHrs({ start: split.giveStart, end: split.giveEnd });
+          if (totalHours(idlest) + givenHrs >= totalHours(donor) - givenHrs) continue; // wouldn't narrow the gap
+
+          idlest.tasks.push({
+            id: uid(), type: t.type,
+            label: autogenLabel(t.type, { start: split.giveStart, end: split.giveEnd }),
+            start: split.giveStart, end: split.giveEnd,
+            color: t.color,
+          });
+
+          // Donor keeps whatever's left on either side of the carved-out
+          // slice — one piece if it came off an edge, two if it came from
+          // the middle, replacing the original shift either way. A
+          // guaranteed turn (e.g. Service's guaranteed VAC) stays protected
+          // as long as the donor keeps some sliver of it.
+          donor.tasks = donor.tasks.filter(x => x.id !== t.id);
+          [{ start: split.headStart, end: split.headEnd }, { start: split.tailStart, end: split.tailEnd }]
+            .filter(r => hhmmToMinutesOfDay(r.end) > hhmmToMinutesOfDay(r.start))
+            .forEach(r => donor.tasks.push({
+              id: uid(), type: t.type,
+              label: autogenLabel(t.type, { start: r.start, end: r.end }),
+              start: r.start, end: r.end,
+              color: t.color,
+              ...(t.guaranteed ? { guaranteed: true } : {}),
+            }));
+
+          moved = true;
+          break outer;
+        }
+      }
+    }
+
+    if (!moved) break; // no safe handoff left anywhere — leave the remaining gap as-is
+  }
+}
+
+function openAutogenModal() {
+  document.getElementById('autogen-day-label').textContent = data.day;
+  renderAutogenRows();
+  document.getElementById('autogen-result').style.display = 'none';
+  openModal('modal-generator');
+  dismissAutogenCallout(); // they've found it — stop nagging
+}
+
+// One-time "generate here" pointer at the Auto-Generate button. Dismissed
+// either explicitly (×) or the first time the modal's actually opened;
+// remembered in localStorage so it doesn't come back on reload.
+const AUTOGEN_CALLOUT_KEY = 'scheduleGen_autogenCalloutDismissed';
+function dismissAutogenCallout() {
+  localStorage.setItem(AUTOGEN_CALLOUT_KEY, '1');
+  const el = document.getElementById('autogen-callout');
+  if (el) el.classList.add('hidden');
+}
+if (localStorage.getItem(AUTOGEN_CALLOUT_KEY)) {
+  const el = document.getElementById('autogen-callout');
+  if (el) el.classList.add('hidden');
+}
+
+function renderAutogenRows() {
+  const tbody = document.getElementById('autogen-body');
+  const sections = [
+    { group: 'combatants', label: 'COMBATANTS' },
+    { group: 'service',    label: 'SERVICE' },
+  ];
+
+  tbody.innerHTML = sections.map(section => {
+    const people = data.personnel.filter(p => p.group === section.group);
+    if (!people.length) return '';
+    const rows = people.map(person => {
+      const pref = ensureTimePref(person);
+      const checks = AUTOGEN_TIME_OPTIONS.map(opt => `
+        <td style="text-align:center">
+          <input type="checkbox" ${pref.includes(opt) ? 'checked' : ''}
+                 onchange="toggleTimePref('${person.id}','${opt}')">
+        </td>`).join('');
+      return `<tr><td>${person.name}${person.role ? ` (${person.role})` : ''}</td>${checks}</tr>`;
+    }).join('');
+    return `<tr class="group-hdr"><td colspan="${AUTOGEN_TIME_OPTIONS.length + 1}">${section.label}</td></tr>${rows}`;
+  }).join('');
+}
+
+// A person can take a shift only if it doesn't overlap an existing task and
+// leaves at least a 1hr gap either side — this is what keeps every generated
+// shift (max 3hrs each) separated by a proper break.
 function canAssign(person, start, end) {
   const [sM, eM] = taskBounds(start, end);
   for (const task of person.tasks) {
@@ -992,85 +1360,174 @@ function canAssign(person, start, end) {
   return true;
 }
 
-function runGenerator() {
-  const clearFirst = document.getElementById('gen-clear').checked;
-  const rotate     = document.getElementById('gen-rotate').checked;
+// PHASE 1 — Sentry's rotation is decided as a straight round-robin across
+// the whole window before anything else is touched. With N Combatants and
+// Sentry's 11hr window splitting into N-ish 3hr slots, this is what
+// guarantees everyone gets a turn: deciding Sentry hour-by-hour alongside
+// the other 3 posts (the old approach) let whoever happened to be free grab
+// it repeatedly, since by the time the last slot rolled around the person
+// who "should" get it was often already busy elsewhere for that exact hour.
+// Within that rotation, whoever's stated a preference for this slot's time
+// of day is tried before the others.
+function autogenAssignSentryRotation(gaps) {
+  const pool = autogenEligiblePool('Sentry');
+  if (!pool.length) return 0;
+  const win = TASK_WINDOWS.Sentry;
+  let assignedCount = 0;
+  let cur = win.start;
+  let idx = 0;
 
-  if (clearFirst) data.personnel.forEach(p => { p.tasks = []; });
+  while (hhmmToMinutesOfDay(cur) < hhmmToMinutesOfDay(win.end)) {
+    const maxEnd = hourPlus(cur, AUTOGEN_SHIFT_HOURS);
+    const targetEnd = hhmmToMinutesOfDay(maxEnd) > hhmmToMinutesOfDay(win.end) ? win.end : maxEnd;
+    const periodKey = autogenPeriodForHour(cur);
 
-  const log = [];
-  let totalAssigned = 0;
-  let totalUnfilled = 0;
+    const rotationOrder = pool.map((_, i) => (idx + i) % pool.length);
+    const tryOrder = [...rotationOrder].sort((ra, rb) => {
+      const aMatch = autogenMatchesTimePref(pool[ra], periodKey) ? 0 : 1;
+      const bMatch = autogenMatchesTimePref(pool[rb], periodKey) ? 0 : 1;
+      return aMatch - bMatch;
+    });
 
-  for (const req of genRequirements) {
-    const shifts = breakIntoShifts(req.start, req.end, req.shiftHours);
-    const pool   = data.personnel.filter(p => p.group === req.group);
-
-    if (pool.length === 0) {
-      log.push(`⚠ No personnel in group for ${req.type} — skipped.`);
-      totalUnfilled += shifts.length;
-      continue;
-    }
-
-    let startIdx = 0;
-    for (const shift of shifts) {
-      const order = Array.from({ length: pool.length }, (_, i) => (startIdx + i) % pool.length);
-      if (rotate) order.sort((a, b) => totalHours(pool[a]) - totalHours(pool[b]));
-
-      let assigned = false;
-      for (const idx of order) {
-        const person = pool[idx];
-        if (!allowedTypes(person.group).includes(req.type)) continue;
-        if (canAssign(person, shift.start, shift.end)) {
-          person.tasks.push({
-            id: uid(), type: req.type,
-            label: `${req.type} ${shift.start}-${shift.end}`,
-            start: shift.start, end: shift.end,
-            color: taskColor(req.color, req.type),
+    let assigned = false;
+    for (const poolIdx of tryOrder) {
+      const candidate = pool[poolIdx];
+      let end = targetEnd;
+      while (hhmmToMinutesOfDay(end) > hhmmToMinutesOfDay(cur)) {
+        if (canAssign(candidate, cur, end)) {
+          candidate.tasks.push({
+            id: uid(), type: 'Sentry',
+            label: autogenLabel('Sentry', { start: cur, end }),
+            start: cur, end,
+            color: taskColor(null, 'Sentry'),
           });
-          startIdx = (idx + 1) % pool.length;
-          totalAssigned++;
+          assignedCount++;
+          idx = (poolIdx + 1) % pool.length;
+          cur = end;
           assigned = true;
           break;
         }
+        end = hourPlus(end, -1);
       }
-      if (!assigned) {
-        log.push(`⚠ Could not fill ${req.type} ${shift.start}–${shift.end} (no available person)`);
-        totalUnfilled++;
-      }
+      if (assigned) break;
     }
+    if (!assigned) { gaps.push(`Sentry ${cur}`); cur = targetEnd; }
+  }
+  return assignedCount;
+}
+
+// PHASE 1B — same guarantee as Sentry above, applied to VAC and Service:
+// walks forward from VAC's window start handing one turn per Service member
+// (in preference-aware order, repeating only once everyone still needing a
+// turn has been tried and none fit) so nobody goes the whole day without
+// VAC. Phase 2 still fills in the rest of the day for VAC same as PAC/PO —
+// Service and Combatants both remain free to pick up further turns there.
+function autogenAssignServiceVacTurns(gaps) {
+  const pool = data.personnel.filter(p => p.group === 'service');
+  if (!pool.length) return 0;
+  const win = TASK_WINDOWS.VAC;
+  let assignedCount = 0;
+  let cur = win.start;
+
+  while (hhmmToMinutesOfDay(cur) < hhmmToMinutesOfDay(win.end)) {
+    const remaining = pool.filter(p => !autogenHasServedType(p, 'VAC'));
+    if (!remaining.length) break; // everyone's had their guaranteed turn
+
+    const periodKey = autogenPeriodForHour(cur);
+    const ordered = [...remaining].sort((a, b) => {
+      const aMatch = autogenMatchesTimePref(a, periodKey) ? 0 : 1;
+      const bMatch = autogenMatchesTimePref(b, periodKey) ? 0 : 1;
+      return aMatch - bMatch;
+    });
+
+    const maxEnd = hourPlus(cur, AUTOGEN_SHIFT_HOURS);
+    const targetEnd = hhmmToMinutesOfDay(maxEnd) > hhmmToMinutesOfDay(win.end) ? win.end : maxEnd;
+
+    let assigned = false;
+    for (const candidate of ordered) {
+      let end = targetEnd;
+      while (hhmmToMinutesOfDay(end) > hhmmToMinutesOfDay(cur)) {
+        if (canAssign(candidate, cur, end)) {
+          candidate.tasks.push({
+            id: uid(), type: 'VAC',
+            label: autogenLabel('VAC', { start: cur, end }),
+            start: cur, end,
+            color: taskColor(null, 'VAC'),
+            guaranteed: true,
+          });
+          assignedCount++;
+          cur = end;
+          assigned = true;
+          break;
+        }
+        end = hourPlus(end, -1);
+      }
+      if (assigned) break;
+    }
+    if (!assigned) cur = targetEnd; // nobody still needing a turn fit here — try later in the day
   }
 
-  // Randomly assign flags (3 combatants each) and prowl (2 combatants)
-  const baseCombatants = data.personnel.filter(p => p.group === 'combatants');
-  assignCombatants('flag0600', 3, '⚠ Fewer than 3 combatants — 0600 Flag incomplete.', log, baseCombatants);
-  assignCombatants('flag1800', 3, null, log, baseCombatants);
-  assignCombatants('prowl',    2, '⚠ Fewer than 2 combatants — Morning Prowl incomplete.', log, baseCombatants);
+  pool.filter(p => !autogenHasServedType(p, 'VAC')).forEach(p => gaps.push(`VAC turn for ${p.name}`));
+  return assignedCount;
+}
 
-  const resultEl = document.getElementById('gen-result');
-  const unfilledNote = totalUnfilled > 0
-    ? `<br><b>${totalUnfilled} shift(s) could not be filled</b> — add more personnel or adjust shift lengths.`
+// PHASE 2 — hour-by-hour relay for the 3 shared posts, working around
+// whatever Sentry/Service-VAC commitments already locked in above.
+// autogenFillPost's shrinking fallback is what makes this safe: if someone's
+// ideal 3hr block would run into one of their own other commitments, it
+// hands them a shorter block that fits instead of leaving the post empty.
+function autogenAssignSharedPosts(gaps) {
+  let assignedCount = 0;
+  for (const h of AUTOGEN_HOURS) {
+    for (const type of ['PAC', 'VAC', 'PO']) {
+      const win = TASK_WINDOWS[type];
+      if (hhmmToMinutesOfDay(h) < hhmmToMinutesOfDay(win.start)) continue;
+      if (hhmmToMinutesOfDay(h) >= hhmmToMinutesOfDay(win.end)) continue;
+      if (autogenIsHourCovered(type, h)) continue;
+
+      const periodKey = autogenPeriodForHour(h);
+      const result    = autogenFillPost(type, h, periodKey);
+      if (!result) { gaps.push(`${type} ${h}`); continue; }
+      const { person, end: shiftEnd } = result;
+
+      person.tasks.push({
+        id: uid(), type,
+        label: autogenLabel(type, { start: h, end: shiftEnd }),
+        start: h, end: shiftEnd,
+        color: taskColor(null, type),
+      });
+      assignedCount++;
+    }
+  }
+  return assignedCount;
+}
+
+function runAutogenSchedule() {
+  const clearFirst = document.getElementById('autogen-clear').checked;
+  if (clearFirst) {
+    data.personnel.forEach(p => {
+      if (p.group === 'combatants' || p.group === 'service') p.tasks = [];
+    });
+  }
+
+  autogenRotationCursor = { PAC: 0, VAC: 0, PO: 0 };
+  const gaps = [];
+  let assignedCount = 0;
+  assignedCount += autogenAssignSentryRotation(gaps);
+  assignedCount += autogenAssignServiceVacTurns(gaps);
+  assignedCount += autogenAssignSharedPosts(gaps);
+
+  autogenRebalance();
+
+  const resultEl = document.getElementById('autogen-result');
+  const gapNote = gaps.length
+    ? `<br><b>${gaps.length} hour(s) short-staffed</b> — add more personnel to close: ${gaps.join(', ')}.`
     : '';
-  resultEl.innerHTML = `✔ <b>${totalAssigned} shifts assigned.</b>${unfilledNote}${log.length ? '<br>' + log.join('<br>') : ''}`;
-  resultEl.className = 'gen-result ' + (totalUnfilled > 0 ? 'warn' : 'success');
+  resultEl.innerHTML = `✔ <b>${assignedCount} shift(s) assigned</b> for Combatants &amp; Service on Day ${data.day}.${gapNote}`;
+  resultEl.className = 'gen-result ' + (gaps.length ? 'warn' : 'success');
   resultEl.style.display = '';
 
   render();
-}
-
-function assignCombatants(metaKey, count, warnMsg, log, base) {
-  const pool = shuffle(base);
-  if (pool.length < count && warnMsg) log.push(warnMsg);
-  data.meta[metaKey] = pool.slice(0, count).map(p => p.name).join(',');
-}
-
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 // ═══════════════════════════════════════════════
@@ -1188,22 +1645,33 @@ const META_DEFAULTS = {
   date: new Date().toISOString().slice(0, 10),
 };
 
+function mergeDayEntry(target, src) {
+  if (!src) return;
+  if (src.wbgt      !== undefined) target.wbgt      = src.wbgt;
+  if (src.groups    !== undefined) target.groups    = src.groups;
+  if (src.personnel !== undefined) target.personnel = src.personnel;
+  target.meta = { ...META_DEFAULTS, ...target.meta, ...(src.meta ?? {}) };
+  target.meta.ignoredViolations = Array.isArray(target.meta.ignoredViolations)
+    ? target.meta.ignoredViolations : [];
+}
+
 function applyParsed(parsed) {
   if (!parsed) return;
-  const d = parsed.data || parsed; // support both {data, genRequirements} and raw data
-  if (d.day       !== undefined) data.day       = d.day;
-  if (d.wbgt      !== undefined) data.wbgt      = d.wbgt;
-  if (d.groups    !== undefined) data.groups    = d.groups;
-  if (d.personnel !== undefined) data.personnel = d.personnel;
-  data.meta = { ...META_DEFAULTS, ...data.meta, ...(d.meta ?? {}) };
-  data.meta.ignoredViolations = Array.isArray(data.meta.ignoredViolations)
-    ? data.meta.ignoredViolations : [];
-  if (parsed.genRequirements) genRequirements = parsed.genRequirements;
+  if (parsed.allDays) {
+    // Current multi-day token format: { allDays: {1,2,3}, day }
+    for (let i = 1; i <= 3; i++) mergeDayEntry(allDays[i], parsed.allDays[i]);
+    applyDayPointers(parsed.day || 1);
+  } else {
+    // Legacy single-day token format: { data: {day, wbgt, groups, personnel, meta}, genRequirements }
+    const d = parsed.data || parsed;
+    mergeDayEntry(allDays[1], d);
+    applyDayPointers(1);
+  }
 }
 
 function saveToStorage() {
   try {
-    const token = encodeToken({ data, genRequirements });
+    const token = encodeToken({ allDays, day: data.day });
     localStorage.setItem(STORAGE_TOKEN_KEY, token);
     flashSaveIndicator();
   } catch (e) {
@@ -1222,8 +1690,6 @@ function loadFromStorage() {
     if (oldData) {
       const parsed = JSON.parse(oldData);
       applyParsed(parsed);
-      const oldGen = localStorage.getItem('scheduleGen_genRequirements');
-      if (oldGen) genRequirements = JSON.parse(oldGen);
       // Re-save in new token format and clear old keys
       saveToStorage();
       localStorage.removeItem('scheduleGen_data');
@@ -1354,7 +1820,7 @@ function decodeToken(token) {
 
 function shareAsLink(btn) {
   try {
-    const token   = encodeToken({ data, genRequirements });
+    const token   = encodeToken({ allDays, day: data.day });
     const base    = location.href.split('#')[0]; // works on file:// and http://
     const url     = base + '#' + token;
     const orig    = btn.textContent;
@@ -1405,6 +1871,6 @@ function loadFromURL() {
 loadFromStorage();
 const _urlLoaded = loadFromURL();
 if (_urlLoaded) saveToStorage();
-document.getElementById('day-input').value = data.day;
+updateDayTabsUI();
 initColGroup();
 render();

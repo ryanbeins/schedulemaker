@@ -25,19 +25,20 @@
     <div id="toolbar">
         <h1>⏱ Schedule Maker</h1>
         <span class="tb-sep"></span>
-        <label>Day:
-            <select id="day-input" onchange="setDay(this.value)">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-            </select>
-        </label>
         <button class="tb-btn grey tb-hamburger" onclick="toggleToolbarMenu()" aria-label="Menu">☰</button>
         <div id="tb-menu">
             <button class="tb-btn blue" onclick="openWBGTModal()">Edit WBGT</button>
+            <div class="tb-hint-wrap">
+                <button class="tb-btn gold" onclick="openAutogenModal()">⚡ Auto-Generate</button>
+                <div id="autogen-callout" class="tb-callout">
+                    Generate your schedule here!
+                    <button class="tb-callout-close" onclick="dismissAutogenCallout()" aria-label="Dismiss">×</button>
+                </div>
+            </div>
             <button class="tb-btn grey" onclick="window.print()">🖨 Print</button>
             <button class="tb-btn teal" onclick="shareAsLink(this)">🔗 Share Link</button>
             <button class="tb-btn indigo" onclick="captureScreenshot(this)">📸 Screenshot</button>
+            <button class="tb-btn red" onclick="clearDay()">🗑 Clear Day</button>
         </div>
         <span class="tb-sep tb-hint"></span>
         <span id="save-indicator"></span>
@@ -50,6 +51,13 @@
         </div>
     </div>
     <div id="mobile-scroll-hint">&#8592; Swipe to view full schedule &nbsp;·&nbsp; Tap timeline to add task &#8594;</div>
+
+    <!-- DAY TABS -->
+    <div id="day-tabs">
+        <button class="day-tab" data-day="1" onclick="setDay(1)">Day 1</button>
+        <button class="day-tab" data-day="2" onclick="setDay(2)">Day 2</button>
+        <button class="day-tab" data-day="3" onclick="setDay(3)">Day 3</button>
+    </div>
 
     <!-- SCHEDULE -->
     <div id="capture-area">
@@ -96,6 +104,7 @@
                 <option value="Sentry">Sentry</option>
                 <option value="PAC">PAC</option>
                 <option value="VAC">VAC</option>
+                <option value="PO">PO</option>
                 <option value="ND">ND</option>
                 <option value="SIGC">SIGC</option>
                 <option value="GC/PO">GC/PO</option>
@@ -162,46 +171,39 @@
         </div>
     </div>
 
-    <!-- Generator Modal -->
+    <!-- Auto-Generate Modal -->
     <div class="modal-overlay" id="modal-generator">
         <div class="modal modal-wide">
-            <h2>⚡ Schedule Generator</h2>
-            <p class="gen-subtitle">Define what needs to be covered. The generator will distribute shifts across your personnel, respecting the 3hr max and 1hr break rules.</p>
+            <h2>⚡ Auto-Generate Schedule — Day <span id="autogen-day-label">1</span></h2>
+            <p class="gen-subtitle">Every hour keeps a Sentry, PAC, VAC and PO covered at once (Sentry 0700–1800, PAC/PO 0800–2000, VAC 0700–2000), rotating people through in 3hr blocks with a 1hr break after each. Tick each person's preferred time of day below (up to 2, or "Anything" if they're flexible) — it's a soft preference, so someone may still get used outside it if that's the only way to keep every post covered. Any PAC/VAC/PO shift covering 1800–2000 is automatically labeled "till secured".</p>
 
             <div class="gen-options">
                 <label class="gen-check">
-                    <input type="checkbox" id="gen-clear" checked>
-                    Clear existing tasks before generating
-                </label>
-                <label class="gen-check">
-                    <input type="checkbox" id="gen-rotate" checked>
-                    Rotate fairly (spread workload evenly)
+                    <input type="checkbox" id="autogen-clear" checked>
+                    Clear existing Combatants/Service tasks before generating
                 </label>
             </div>
 
             <div class="gen-table-wrap">
-                <table class="gen-table" id="gen-req-table">
+                <table class="gen-table" id="autogen-table">
                     <thead>
                         <tr>
-                            <th>Task Type</th>
-                            <th>Coverage Start</th>
-                            <th>Coverage End</th>
-                            <th>Shift Length (hrs)</th>
-                            <th>Assigned Group</th>
-                            <th>Color</th>
-                            <th></th>
+                            <th>Person</th>
+                            <th>Anything</th>
+                            <th>Morning</th>
+                            <th>Afternoon</th>
+                            <th>Evening</th>
                         </tr>
                     </thead>
-                    <tbody id="gen-req-body"></tbody>
+                    <tbody id="autogen-body"></tbody>
                 </table>
             </div>
-            <button class="add-person-btn" onclick="addGenRow()">+ Add Requirement</button>
 
-            <div id="gen-result" class="gen-result" style="display:none"></div>
+            <div id="autogen-result" class="gen-result" style="display:none"></div>
 
             <div class="modal-btns" style="margin-top:14px">
                 <button class="btn-cancel" onclick="closeModal('modal-generator')">Cancel</button>
-                <button class="btn-primary" style="background:#7b2ff7" onclick="runGenerator()">⚡ Generate Schedule</button>
+                <button class="btn-primary" style="background:#7b2ff7" onclick="runAutogenSchedule()">⚡ Generate Schedule</button>
             </div>
         </div>
     </div>

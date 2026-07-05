@@ -37,11 +37,6 @@ body {
 }
 #toolbar h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; margin-right: 4px; color: #e2f0ff; }
 #toolbar label { font-size: 11px; color: #94b4cc; }
-#toolbar select#day-input {
-  padding: 3px 6px; border-radius: 5px;
-  border: 1px solid #3a5a74; background: #0f2033; color: #e2f0ff;
-  font-size: 12px; cursor: pointer;
-}
 .tb-btn {
   padding: 5px 13px; border: none; border-radius: 6px; cursor: pointer;
   font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
@@ -56,11 +51,125 @@ body {
 .tb-btn.purple { background: #8b5cf6; color: #fff; }
 .tb-btn.teal   { background: #0d9488; color: #fff; }
 .tb-btn.indigo { background: #4f46e5; color: #fff; }
+.tb-btn.red    { background: #ef4444; color: #fff; }
+.tb-btn.gold {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fff3b0 0%, #f0c419 30%, #c8960c 65%, #ffe28a 100%);
+  color: #4a3800;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  animation: gold-glow 2.4s ease-in-out infinite;
+}
+.tb-btn.gold::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 35%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.85), transparent);
+  transform: skewX(-20deg);
+  animation: gold-shine 3.2s ease-in-out infinite;
+}
+@keyframes gold-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(240,196,25,0.5), 0 2px 4px rgba(0,0,0,0.25); }
+  50%      { box-shadow: 0 0 16px rgba(255,215,60,0.95), 0 2px 4px rgba(0,0,0,0.25); }
+}
+@keyframes gold-shine {
+  0%   { left: -60%; }
+  45%  { left: 130%; }
+  100% { left: 130%; }
+}
 .tb-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.15); }
 #save-indicator {
   font-size: 11px; font-weight: 700; color: #4ade80;
   opacity: 0; transition: opacity 0.4s;
   white-space: nowrap; letter-spacing: 0.3px;
+}
+
+/* ═══════════════════════════════════════════
+   AUTO-GENERATE CALLOUT
+═══════════════════════════════════════════ */
+.tb-hint-wrap { position: relative; display: inline-flex; }
+.tb-callout {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #7b2ff7;
+  color: #fff;
+  padding: 7px 10px 7px 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+  z-index: 60;
+  animation: callout-in 0.3s ease;
+}
+.tb-callout::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #7b2ff7;
+}
+.tb-callout-close {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: #fff;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.tb-callout-close:hover { background: rgba(255,255,255,0.35); }
+.tb-callout.hidden { display: none; }
+@keyframes callout-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ═══════════════════════════════════════════
+   DAY TABS
+═══════════════════════════════════════════ */
+#day-tabs {
+  display: flex;
+  gap: 4px;
+  background: #0d1a27;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.day-tab {
+  padding: 8px 20px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: #94b4cc;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.day-tab:hover { background: rgba(255,255,255,0.06); color: #e2f0ff; }
+.day-tab.active {
+  background: #e8edf4;
+  color: #0f1f2e;
+  border-bottom-color: #3b82f6;
 }
 
 /* ═══════════════════════════════════════════
@@ -732,6 +841,20 @@ td.total-d2 { background: #fefce8; }
 .footer-prowl-select:focus { outline: none; border-color: #3b82f6; background: #eff6ff; }
 .footer-prowl-select:hover { border-color: #93c5fd; }
 
+.prowl-rng-btn {
+  flex-shrink: 0;
+  width: 36px;
+  min-height: 36px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.prowl-rng-btn:hover  { border-color: #93c5fd; background: #eff6ff; transform: rotate(-8deg) scale(1.08); }
+.prowl-rng-btn:active { transform: rotate(8deg) scale(0.95); }
+
 /* Total Strength three-field layout */
 .strength-fields {
   display: flex;
@@ -843,16 +966,12 @@ td.total-d2 { background: #fefce8; }
     gap: 8px;
     flex-shrink: 0;
   }
-  #toolbar select#day-input {
-    padding: 10px 8px;
-    font-size: 18px;
-    font-weight: 700;
-    min-height: 48px;
-    border-radius: 8px;
-    border: 2px solid #3a5a74;
-    background: #0f2033;
-    color: #e2f0ff;
-    cursor: pointer;
+  #day-tabs { padding: 8px 10px 0; gap: 6px; }
+  .day-tab {
+    flex: 1;
+    padding: 12px 8px;
+    font-size: 14px;
+    min-height: 44px;
   }
 
   /* Full-screen dropdown panel */
@@ -947,6 +1066,7 @@ td.total-d2 { background: #fefce8; }
   .footer-row.footer-flags td { font-size: 13px; }
   .footer-row.footer-flags .footer-prowl-select { font-size: 15px !important; min-height: 44px; }
   .footer-prowl-select { font-size: 15px !important; min-height: 44px; }
+  .prowl-rng-btn { width: 44px; min-height: 44px; font-size: 18px; }
   .strength-inp { width: 52px !important; min-height: 44px !important; font-size: 17px !important; }
   .strength-label { font-size: 10px; }
   .footer-date-input { min-height: 46px; font-size: 16px !important; }
@@ -963,7 +1083,7 @@ td.total-d2 { background: #fefce8; }
    PRINT
 ═══════════════════════════════════════════ */
 @media print {
-  #toolbar, .add-person-btn, .timeline-click-zone, #constraint-legend { display: none !important; }
+  #toolbar, #day-tabs, .add-person-btn, .timeline-click-zone, #constraint-legend { display: none !important; }
   body { background: #fff; }
   #schedule-wrapper { padding: 0; }
   #schedule-table { box-shadow: none; border-radius: 0; }
