@@ -4,7 +4,8 @@
 const TIME_SLOTS = [
   { label: '2000-0000', start: '2000', end: '0000', hours: 4 },
   { label: '0000-0400', start: '0000', end: '0400', hours: 4 },
-  { label: '0400-0800', start: '0400', end: '0800', hours: 4 },
+  { label: '0400-0600', start: '0400', end: '0600', hours: 2 },
+  { label: '0600-0800', start: '0600', end: '0800', hours: 2 },
   { label: '0800-1000', start: '0800', end: '1000', hours: 2 },
   { label: '1000-1200', start: '1000', end: '1200', hours: 2 },
   { label: '1200-1400', start: '1200', end: '1400', hours: 2 },
@@ -12,6 +13,9 @@ const TIME_SLOTS = [
   { label: '1600-1800', start: '1600', end: '1800', hours: 2 },
   { label: '1800-2000', start: '1800', end: '2000', hours: 2 },
 ];
+// Name column + one per time slot + Total column — the full table width in
+// <td>s, used for footer/divider rows that need to span the whole table.
+const TOTAL_TABLE_COLS = TIME_SLOTS.length + 2;
 const TOTAL_MINS     = 24 * 60;
 const DAY_START_MINS = 20 * 60;
 
@@ -65,7 +69,7 @@ function defaultGroups() {
 
 function defaultWBGT() {
   return {
-    '2000': 'WHITE', '0000': 'WHITE', '0400': 'WHITE',
+    '2000': 'WHITE', '0000': 'WHITE', '0400': 'WHITE', '0600': 'WHITE',
     '0800': 'WHITE', '1000': 'GREEN', '1200': 'RED',
     '1400': 'YELLOW', '1600': 'WHITE', '1800': 'WHITE',
   };
@@ -196,13 +200,16 @@ applyDayPointers(1);
 function uid() { return '_' + Math.random().toString(36).slice(2, 9); }
 
 const LANE_H = window.matchMedia('(pointer: coarse)').matches ? 54 : 42;
-const SILENT_STARTS = new Set(['2000', '0000', '0400', '1800']);
+const SILENT_STARTS = new Set(['2000', '0000', '0400', '0600', '1800']);
 function isSilentSlot(slot) { return SILENT_STARTS.has(slot.start); }
 
-// Visual scale: silent slots get 0.5× space, non-silent get 1.5× space
-// Morning silent slots (2000–0800) stay squashed; evening 1800–2000 matches non-silent width
-const MORNING_SILENT = new Set(['2000', '0000', '0400']);
-const VISUAL_SLOT_WEIGHTS = TIME_SLOTS.map(s => MORNING_SILENT.has(s.start) ? 0.40 : 1.60);
+// Visual scale: most silent slots get 0.5× space, non-silent get 1.5× space.
+// 0400/0600 and 1800 get full non-silent width since they now regularly carry
+// real early/late duty tasks (e.g. the 0700–0800 Sentry/VAC turn) that need
+// room to read; only the deep-night 2000–0400 stretch (rarely used) stays
+// squashed.
+const SQUASHED_SILENT = new Set(['2000', '0000']);
+const VISUAL_SLOT_WEIGHTS = TIME_SLOTS.map(s => SQUASHED_SILENT.has(s.start) ? 0.40 : 1.60);
 
 const SLOT_BOUNDARIES = (() => {
   const b = [];
@@ -373,7 +380,7 @@ function renderHead() {
   const r1 = thead.insertRow();
   r1.className = 'super-hdr';
   th(r1, '', 1, 1);
-  th(r1, 'Silent Hours', 1, 3).classList.add('super-silent');
+  th(r1, 'Silent Hours', 1, 4).classList.add('super-silent');
   th(r1, 'Non-Silent Hours', 1, 5).classList.add('super-nonsilent');
   th(r1, 'Silent Hours', 1, 1).classList.add('super-silent');
   th(r1, 'Total', 1, 1);
@@ -382,10 +389,12 @@ function renderHead() {
   r2.className = 'hdr-top';
   th(r2, `Day ${data.day}`);
   TIME_SLOTS.forEach(s => {
-    const isMorn = MORNING_SILENT.has(s.start);
+    // Only the squashed deep-night slots need the cramped narrow styling —
+    // see VISUAL_SLOT_WEIGHTS.
+    const isNarrow = SQUASHED_SILENT.has(s.start);
     const cell = th(r2, s.label);
     cell.classList.add(isSilentSlot(s) ? 'col-silent' : 'col-nonsilent');
-    if (isMorn) cell.classList.add('col-narrow');
+    if (isNarrow) cell.classList.add('col-narrow');
   });
   th(r2, 'Total D2');
 
@@ -396,7 +405,8 @@ function renderHead() {
     const code = data.wbgt[s.start] || 'WHITE';
     const cell = r3.insertCell();
     cell.textContent = code;
-    cell.className = (WBGT_CLASSES[code] || 'wbgt-white') + (isSilentSlot(s) ? ' wbgt-silent-col' : '') + (MORNING_SILENT.has(s.start) ? ' wbgt-narrow' : '');
+    const isNarrow = SQUASHED_SILENT.has(s.start);
+    cell.className = (WBGT_CLASSES[code] || 'wbgt-white') + (isSilentSlot(s) ? ' wbgt-silent-col' : '') + (isNarrow ? ' wbgt-narrow' : '');
   });
   r3.insertCell();
 }
@@ -422,7 +432,7 @@ function renderBody() {
     const gRow = tbody.insertRow();
     gRow.className = 'group-hdr';
     const gCell = gRow.insertCell();
-    gCell.colSpan = 11;
+    gCell.colSpan = TOTAL_TABLE_COLS;
     gCell.style.display = 'flex';
     gCell.style.alignItems = 'center';
     gCell.style.gap = '10px';
@@ -455,7 +465,7 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
   nameCell.onclick = () => openEditPersonModal(person.id);
 
   const timeCell = row.insertCell();
-  timeCell.colSpan = 9;
+  timeCell.colSpan = TIME_SLOTS.length;
   timeCell.className = 'timeline-cell';
 
   const { assignments, laneCount } = assignLanes(person.tasks);
@@ -471,7 +481,7 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
   TIME_SLOTS.forEach((slot, i) => {
     const s = (SLOT_BOUNDARIES[i].vu     / TOTAL_VISUAL_UNITS * 100).toFixed(3) + '%';
     const e = (SLOT_BOUNDARIES[i + 1].vu / TOTAL_VISUAL_UNITS * 100).toFixed(3) + '%';
-    const isNight = MORNING_SILENT.has(slot.start) || slot.start === '1800';
+    const isNight = isSilentSlot(slot);
     const color   = isNight ? NIGHT_BG : (WBGT_TINT[data.wbgt[slot.start] || 'WHITE'] || '#f8fafc');
     gradStops.push(`${color} ${s}`, `${color} ${e}`);
   });
@@ -705,7 +715,7 @@ function makeFooterEditable(cell, getV, setV, opts = {}) {
 
 function renderFooter(tbody, constraintCache) {
   const divRow = tbody.insertRow();
-  divRow.insertCell().colSpan = 11;
+  divRow.insertCell().colSpan = TOTAL_TABLE_COLS;
   divRow.cells[0].className = 'footer-divider';
 
   // === Flag row ===
@@ -719,7 +729,7 @@ function renderFooter(tbody, constraintCache) {
   const fl3 = flagRow.insertCell(); fl3.colSpan = 2;
   fl3.innerHTML = '<b>1800 flag:</b>';
   fl3.style.textAlign = 'right';
-  const fc5 = flagRow.insertCell(); fc5.colSpan = 4;
+  const fc5 = flagRow.insertCell(); fc5.colSpan = TOTAL_TABLE_COLS - 7; // 7 = fl1 + fc3 + fl3
   makeProwlSelects(fc5, 'flag1800', 3, { randomize: true });
 
   // === Prowl row ===
@@ -740,7 +750,7 @@ function renderFooter(tbody, constraintCache) {
   pr2.innerHTML = '<b>Morning Prowl:</b><br>';
   makeProwlSelects(pr2, 'prowl');
   const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength:</b>'; pr4.style.textAlign = 'right';
-  const pr6 = prowlRow.insertCell(); pr6.colSpan = 4;
+  const pr6 = prowlRow.insertCell(); pr6.colSpan = TOTAL_TABLE_COLS - 7; // 7 = cbCell + pr2 + pr4
 
   const strParts = (data.meta.strength || '00 / 00 / 00').split('/').map(p => p.trim());
   const strDiv = document.createElement('div');
@@ -790,7 +800,7 @@ function renderFooter(tbody, constraintCache) {
   const svc2 = nightProwlRow1.insertCell(); svc2.colSpan = 3;
   svc2.innerHTML = '<b>Service Avg Mounting hrs:</b>';
   svc2.style.cssText = 'text-align:right;vertical-align:middle;';
-  const svc3 = nightProwlRow1.insertCell(); svc3.colSpan = 2;
+  const svc3 = nightProwlRow1.insertCell(); svc3.colSpan = TOTAL_TABLE_COLS - 9; // 9 = leading cell + np1 + svc2
   const computedAvg = calcSvcAvg();
   data.meta.svcAvg = computedAvg;
   svc3.textContent = computedAvg > 0 ? computedAvg.toFixed(2) + ' hrs' : '—';
@@ -799,7 +809,7 @@ function renderFooter(tbody, constraintCache) {
   const nightProwlRow2 = tbody.insertRow();
   nightProwlRow2.className = 'footer-row';
   nightProwlRow2.insertCell().colSpan = 2;
-  const np2 = nightProwlRow2.insertCell(); np2.colSpan = 9;
+  const np2 = nightProwlRow2.insertCell(); np2.colSpan = TOTAL_TABLE_COLS - 2; // 2 = leading cell
   np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
   makeProwlSelects(np2, 'nightProwl2');
 
