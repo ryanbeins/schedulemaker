@@ -143,6 +143,53 @@ body {
 }
 
 /* ═══════════════════════════════════════════
+   IMPORT TOAST
+═══════════════════════════════════════════ */
+.import-toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translate(-50%, -140%);
+  background: #16a34a;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.import-toast.show { animation: toast-pop 2.2s ease forwards; }
+.import-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  font-size: 11px;
+}
+.import-toast.show .import-toast-icon { animation: toast-check 0.4s ease 0.15s both; }
+@keyframes toast-pop {
+  0%   { opacity: 0; transform: translate(-50%, -140%); }
+  12%  { opacity: 1; transform: translate(-50%, 0); }
+  85%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -20%); }
+}
+@keyframes toast-check {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════════
    DAY TABS
 ═══════════════════════════════════════════ */
 #day-tabs {
@@ -307,7 +354,6 @@ body {
   font-weight: 700;
   padding: 4px 10px;
   min-width: 120px; max-width: 200px;
-  cursor: pointer;
   background: #f8fafc;
   color: #334155;
   border-left: 3px solid transparent !important;
@@ -329,6 +375,25 @@ body {
   border-left-color: #5ba3c9 !important;
   color: #b8daf0;
 }
+
+/* Drag handle + name text inside the name cell */
+.drag-handle {
+  display: inline-block;
+  cursor: grab;
+  color: #94a3b8;
+  font-size: 14px;
+  margin-right: 6px;
+  touch-action: none;
+  user-select: none;
+}
+.drag-handle:active { cursor: grabbing; color: #3b82f6; }
+.night-row .drag-handle { color: #4a6d8a; }
+.name-text { cursor: pointer; }
+
+/* Row drag states */
+.person-row.dragging-row { opacity: 0.4; }
+.person-row.drag-over-top    td { box-shadow: inset 0 3px 0 0 #3b82f6; }
+.person-row.drag-over-bottom td { box-shadow: inset 0 -3px 0 0 #3b82f6; }
 
 /* ═══════════════════════════════════════════
    TIMELINE CELL — NIGHT / DAY GRADIENT
@@ -559,6 +624,36 @@ td.total-d2 { background: #fefce8; }
   background: #dbeafe;
   box-shadow: 0 4px 14px rgba(59,130,246,0.3);
   transform: translateY(-1px);
+}
+
+/* Clear-all-in-group pill button */
+.clear-group-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  border: none;
+  border-radius: 20px;
+  background: #ef4444;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.clear-group-btn:hover {
+  background: #fff;
+  color: #b91c1c;
+  transform: translateY(-1px) scale(1.06);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+}
+.clear-group-btn .add-btn-icon {
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
 }
 
 
@@ -1060,6 +1155,7 @@ td.total-d2 { background: #fefce8; }
     font-size: 12px !important;
     padding: 4px 6px !important;
   }
+  .drag-handle { font-size: 18px; margin-right: 8px; }
 
   /* ── Footer: bigger rows for easy tapping ── */
   .footer-row td { padding: 12px 10px; font-size: 13px; }
@@ -1083,7 +1179,7 @@ td.total-d2 { background: #fefce8; }
    PRINT
 ═══════════════════════════════════════════ */
 @media print {
-  #toolbar, #day-tabs, .add-person-btn, .timeline-click-zone, #constraint-legend { display: none !important; }
+  #toolbar, #day-tabs, .add-person-btn, .clear-group-btn, .timeline-click-zone, #constraint-legend { display: none !important; }
   body { background: #fff; }
   #schedule-wrapper { padding: 0; }
   #schedule-table { box-shadow: none; border-radius: 0; }

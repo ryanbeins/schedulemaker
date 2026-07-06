@@ -93,7 +93,7 @@ function defaultMeta(dateOffsetDays) {
   d.setDate(d.getDate() + dateOffsetDays);
   return {
     flag0600: '', flag1800: '',
-    prowl: '', nightProwl1: '', nightProwl2: '',
+    prowl: '', nightProwl1: '', nightProwl2: '', trash: '',
     strength: '00 / 00 / 00', svcAvg: 0, notes: [], ignoredViolations: [],
     date: d.toISOString().slice(0, 10),
   };
@@ -168,7 +168,7 @@ function demoDay1() {
     ],
     meta: {
       flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
-      prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
+      prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '', trash: '',
       strength: '02 / 06 / 02', svcAvg: 4.5, notes: [], ignoredViolations: [],
       date: new Date().toISOString().slice(0, 10),
     },
@@ -446,6 +446,15 @@ function renderBody() {
     gCell.appendChild(gLabel);
     gCell.appendChild(addBtn);
 
+    if (data.personnel.some(p => p.group === group.id)) {
+      const clearBtn = document.createElement('button');
+      clearBtn.className = 'clear-group-btn';
+      clearBtn.innerHTML = '<span class="add-btn-icon">🗑</span><span class="add-btn-label">Clear All</span>';
+      clearBtn.title = `Remove everyone in ${group.label}`;
+      clearBtn.onclick = () => clearGroup(group.id, group.label);
+      gCell.appendChild(clearBtn);
+    }
+
     data.personnel
       .filter(p => p.group === group.id)
       .forEach(person => renderPersonRow(tbody, person, avg, constraintCache));
@@ -461,8 +470,21 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
 
   const nameCell = row.insertCell();
   nameCell.className = 'name-cell';
-  nameCell.textContent = person.role ? `${person.name} (${person.role})` : person.name;
-  nameCell.onclick = () => openEditPersonModal(person.id);
+
+  const dragHandle = document.createElement('span');
+  dragHandle.className = 'drag-handle';
+  dragHandle.textContent = '⠿';
+  dragHandle.title = 'Drag to reorder or move between groups';
+  dragHandle.addEventListener('mousedown', (e) => startRowDrag(e, person.id));
+  dragHandle.addEventListener('touchstart', (e) => startRowDrag(e, person.id), { passive: false });
+
+  const nameText = document.createElement('span');
+  nameText.className = 'name-text';
+  nameText.textContent = person.role ? `${person.name} (${person.role})` : person.name;
+  nameText.onclick = () => openEditPersonModal(person.id);
+
+  nameCell.appendChild(dragHandle);
+  nameCell.appendChild(nameText);
 
   const timeCell = row.insertCell();
   timeCell.colSpan = TIME_SLOTS.length;
@@ -813,7 +835,12 @@ function renderFooter(tbody, constraintCache) {
   np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
   makeProwlSelects(np2, 'nightProwl2');
 
-
+  const trashRow = tbody.insertRow();
+  trashRow.className = 'footer-row';
+  trashRow.insertCell().colSpan = 2;
+  const tr1 = trashRow.insertCell(); tr1.colSpan = TOTAL_TABLE_COLS - 2; // 2 = leading cell
+  tr1.innerHTML = '<b>Trash:</b><br>';
+  makeProwlSelects(tr1, 'trash', 3);
 }
 
 // ═══════════════════════════════════════════════
@@ -889,6 +916,98 @@ function deletePerson() {
   const idx = data.personnel.findIndex(x => x.id === _editPersonId);
   if (idx !== -1) data.personnel.splice(idx, 1);
   closeModal('modal-person');
+  render();
+}
+
+// Removes every person in a group (and their tasks) in one go. Mutates
+// data.personnel in place via splice — same reason as deletePerson() above,
+// this keeps the array the same object referenced by allDays[day].personnel
+// so the deletion stays isolated to the current day.
+function clearGroup(groupId, label) {
+  const count = data.personnel.filter(p => p.group === groupId).length;
+  if (!count) return;
+  if (!confirm(`Remove all ${count} ${count === 1 ? 'person' : 'people'} in ${label}? This cannot be undone.`)) return;
+  for (let i = data.personnel.length - 1; i >= 0; i--) {
+    if (data.personnel[i].group === groupId) data.personnel.splice(i, 1);
+  }
+  render();
+}
+
+// ═══════════════════════════════════════════════
+//  PARADE STATE IMPORT
+// ═══════════════════════════════════════════════
+// Reads a pasted "PARADE STATE" doc and pulls out three roster sections:
+//   - COMD:     -> Key Appointment Holders (the GC)
+//   - ST CBT:   -> Combatants
+//   - ST SVC:   -> Service
+// Each member line looks like "<RANK> <NAME>" (e.g. "LCP DIMAS", "3SG
+// BEINS", sometimes with trailing ", GC, (...)" notes we ignore). A section
+// ends at the next blank line, divider line, or unrelated "- X:" header, so
+// unrelated blocks (ATTACHMENTS, Status, Others, etc.) are skipped.
+function parseParadeState(text) {
+  const SECTION_HEADERS = [
+    { re: /^-\s*COMD\s*:/i,     key: 'kah' },
+    { re: /^-\s*ST\s*CBT\s*:/i, key: 'combatants' },
+    { re: /^-\s*ST\s*SVC\s*:/i, key: 'service' },
+  ];
+  const titleCase = s => s.split(' ').filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+
+  const result = { kah: [], combatants: [], service: [] };
+  let section = null;
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || /^[-—_]{3,}$/.test(line)) { section = null; continue; }
+
+    const header = SECTION_HEADERS.find(h => h.re.test(line));
+    if (header) { section = header.key; continue; }
+    if (/^-\s*\S/.test(line)) { section = null; continue; } // some other "- Whatever:" header
+
+    if (!section) continue;
+    const m = line.match(/^([A-Za-z0-9]+)\s+(.+)$/);
+    if (!m) continue;
+    const role = m[1].toUpperCase();
+    const name = titleCase(m[2].split(',')[0].trim());
+    if (name) result[section].push({ name, role });
+  }
+  return result;
+}
+
+function openParadeStateModal() {
+  document.getElementById('paradestate-day-label').textContent = data.day;
+  document.getElementById('paradestate-input').value = '';
+  document.getElementById('paradestate-result').style.display = 'none';
+  openModal('modal-paradestate');
+}
+
+function importParadeState() {
+  const text   = document.getElementById('paradestate-input').value;
+  const parsed = parseParadeState(text);
+  const total  = parsed.kah.length + parsed.combatants.length + parsed.service.length;
+  const resultEl = document.getElementById('paradestate-result');
+
+  if (!total) {
+    resultEl.innerHTML = '⚠ No personnel detected — check the text includes "- COMD:", "- ST CBT:", and "- ST SVC:" sections.';
+    resultEl.className = 'gen-result warn';
+    resultEl.style.display = '';
+    return;
+  }
+
+  if (document.getElementById('paradestate-clear').checked) {
+    for (let i = data.personnel.length - 1; i >= 0; i--) {
+      if (['kah', 'combatants', 'service'].includes(data.personnel[i].group)) data.personnel.splice(i, 1);
+    }
+  }
+
+  ['kah', 'combatants', 'service'].forEach(group => {
+    parsed[group].forEach(p => data.personnel.push({ id: uid(), name: p.name, role: p.role, group, tasks: [] }));
+  });
+
+  resultEl.innerHTML = `✔ Imported <b>${parsed.kah.length} GC</b>, <b>${parsed.combatants.length} Combatants</b>, <b>${parsed.service.length} Service</b> for Day ${data.day}.`;
+  resultEl.className = 'gen-result success';
+  resultEl.style.display = '';
+
   render();
 }
 
@@ -1642,6 +1761,73 @@ document.addEventListener('touchmove', (e) => {
 document.addEventListener('touchend', () => { handleDragEnd(); });
 
 // ═══════════════════════════════════════════════
+//  DRAG-TO-REORDER PERSON ROWS
+// ═══════════════════════════════════════════════
+// Separate from the task-bar drag system above — this reorders entries in
+// data.personnel via the small handle in each name cell. Dropping on a row
+// in a different group section reassigns that person to the new group too.
+let rowDragState = null; // { personId, targetId, before }
+
+function startRowDrag(e, personId) {
+  e.preventDefault();
+  e.stopPropagation();
+  rowDragState = { personId, targetId: null, before: true };
+  const row = document.querySelector(`tr[data-person-id="${personId}"]`);
+  if (row) row.classList.add('dragging-row');
+  document.body.style.userSelect = 'none';
+}
+
+function rowDragMove(clientX, clientY) {
+  if (!rowDragState) return;
+  document.querySelectorAll('.person-row').forEach(r => r.classList.remove('drag-over-top', 'drag-over-bottom'));
+  const el = document.elementFromPoint(clientX, clientY);
+  const targetRow = el && el.closest('.person-row');
+  if (!targetRow || targetRow.dataset.personId === rowDragState.personId) {
+    rowDragState.targetId = null;
+    return;
+  }
+  const rect   = targetRow.getBoundingClientRect();
+  const before = clientY < rect.top + rect.height / 2;
+  targetRow.classList.add(before ? 'drag-over-top' : 'drag-over-bottom');
+  rowDragState.targetId = targetRow.dataset.personId;
+  rowDragState.before   = before;
+}
+
+function endRowDrag() {
+  if (!rowDragState) return;
+  document.querySelectorAll('.person-row').forEach(r => r.classList.remove('dragging-row', 'drag-over-top', 'drag-over-bottom'));
+  document.body.style.userSelect = '';
+  const { personId, targetId, before } = rowDragState;
+  rowDragState = null;
+  if (!targetId || targetId === personId) return;
+
+  const moved  = data.personnel.find(p => p.id === personId);
+  const target = data.personnel.find(p => p.id === targetId);
+  if (!moved || !target) return;
+
+  moved.group = target.group; // dropping into another section moves them there too
+
+  // Mutate in place (splice, never reassign) — keeps this the same array
+  // object referenced by allDays[day].personnel so the reorder stays
+  // isolated to the current day.
+  data.personnel.splice(data.personnel.indexOf(moved), 1);
+  let toIdx = data.personnel.indexOf(target);
+  if (!before) toIdx += 1;
+  data.personnel.splice(toIdx, 0, moved);
+
+  render();
+}
+
+document.addEventListener('mousemove', (e) => { rowDragMove(e.clientX, e.clientY); });
+document.addEventListener('mouseup',   () => { endRowDrag(); });
+document.addEventListener('touchmove', (e) => {
+  if (!rowDragState) return;
+  e.preventDefault();
+  rowDragMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+document.addEventListener('touchend', () => { endRowDrag(); });
+
+// ═══════════════════════════════════════════════
 //  TOKEN-BASED STORAGE (localStorage + URL hash)
 // ═══════════════════════════════════════════════
 const STORAGE_TOKEN_KEY = 'scheduleGen_token';
@@ -1649,7 +1835,7 @@ const STORAGE_TOKEN_KEY = 'scheduleGen_token';
 // All meta fields with safe defaults
 const META_DEFAULTS = {
   flag0600: '', flag1800: '',
-  prowl: '', nightProwl1: '', nightProwl2: '',
+  prowl: '', nightProwl1: '', nightProwl2: '', trash: '',
   strength: '00 / 00 / 00', svcAvg: 0, notes: [],
   ignoredViolations: [],
   date: new Date().toISOString().slice(0, 10),
@@ -1816,7 +2002,8 @@ async function captureScreenshot(btn) {
 }
 
 // ═══════════════════════════════════════════════
-//  SHARE AS URL LINK (replaces file export/import)
+//  URL TOKEN (used by localStorage persistence below, and for opening
+//  any schedule links shared before the Share Link button was removed)
 // ═══════════════════════════════════════════════
 // Encode payload to base64 URL token (Unicode-safe)
 function encodeToken(obj) {
@@ -1826,41 +2013,6 @@ function encodeToken(obj) {
 // Decode base64 URL token back to object
 function decodeToken(token) {
   return JSON.parse(decodeURIComponent(escape(atob(token))));
-}
-
-function shareAsLink(btn) {
-  try {
-    const token   = encodeToken({ allDays, day: data.day });
-    const base    = location.href.split('#')[0]; // works on file:// and http://
-    const url     = base + '#' + token;
-    const orig    = btn.textContent;
-
-    const doCopy = (text) => {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
-      }
-      // Fallback for file:// or restricted contexts
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); } catch {}
-      document.body.removeChild(ta);
-      return Promise.resolve();
-    };
-
-    doCopy(url).then(() => {
-      btn.textContent = '✔ Copied!';
-      setTimeout(() => { btn.textContent = orig; }, 2500);
-    }).catch(() => {
-      // Last resort — show URL for manual copy
-      prompt('Copy this link to share your schedule:', url);
-      btn.textContent = orig;
-    });
-  } catch (e) {
-    alert('Could not generate link: ' + e.message);
-  }
 }
 
 function loadFromURL() {
@@ -1873,6 +2025,60 @@ function loadFromURL() {
   } catch {
     return false;
   }
+}
+
+// ═══════════════════════════════════════════════
+//  EXPORT / IMPORT AS FILE
+// ═══════════════════════════════════════════════
+// Plain (non-token) JSON file so another user can just open it in a text
+// editor if needed, or hand it to a teammate to load via Import — no link
+// or shared server required, works fully offline.
+function exportToFile() {
+  try {
+    const payload = { allDays, day: data.day };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `schedule_${data.meta.date || new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Could not export file: ' + e.message);
+  }
+}
+
+function importFromFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      applyParsed(JSON.parse(reader.result));
+      saveToStorage();
+      updateDayTabsUI();
+      render();
+      showImportToast();
+    } catch (e) {
+      alert('Could not import file — it doesn\'t look like a valid schedule export.');
+    }
+  };
+  reader.onerror = () => alert('Could not read that file.');
+  reader.readAsText(file);
+  input.value = ''; // allow re-selecting the same file later
+}
+
+// Re-triggerable "✔ Schedule Imported!" toast — removing then re-adding the
+// class (with a forced reflow in between) restarts the CSS animation even
+// if the user imports a second file right after the first.
+function showImportToast() {
+  const el = document.getElementById('import-toast');
+  if (!el) return;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
 }
 
 // ═══════════════════════════════════════════════

@@ -36,7 +36,10 @@
                 </div>
             </div>
             <button class="tb-btn grey" onclick="window.print()">🖨 Print</button>
-            <button class="tb-btn teal" onclick="shareAsLink(this)">🔗 Share Link</button>
+            <button class="tb-btn teal" onclick="openParadeStateModal()">📋 Parade State</button>
+            <button class="tb-btn green" onclick="exportToFile()">⬇ Export</button>
+            <button class="tb-btn orange" onclick="document.getElementById('import-file-input').click()">⬆ Import</button>
+            <input type="file" id="import-file-input" accept="application/json,.json" style="display:none" onchange="importFromFile(this)">
             <button class="tb-btn indigo" onclick="captureScreenshot(this)">📸 Screenshot</button>
             <button class="tb-btn red" onclick="clearDay()">🗑 Clear Day</button>
         </div>
@@ -51,6 +54,11 @@
         </div>
     </div>
     <div id="mobile-scroll-hint">&#8592; Swipe to view full schedule &nbsp;·&nbsp; Tap timeline to add task &#8594;</div>
+
+    <!-- IMPORT TOAST -->
+    <div id="import-toast" class="import-toast">
+        <span class="import-toast-icon">✔</span> Schedule Imported!
+    </div>
 
     <!-- DAY TABS -->
     <div id="day-tabs">
@@ -190,7 +198,7 @@
                         <tr>
                             <th>Person</th>
                             <th>Anything</th>
-                            <th>Morning</th>
+                            <th>Morning</th>    
                             <th>Afternoon</th>
                             <th>Evening</th>
                         </tr>
@@ -204,6 +212,30 @@
             <div class="modal-btns" style="margin-top:14px">
                 <button class="btn-cancel" onclick="closeModal('modal-generator')">Cancel</button>
                 <button class="btn-primary" style="background:#7b2ff7" onclick="runAutogenSchedule()">⚡ Generate Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parade State Import Modal -->
+    <div class="modal-overlay" id="modal-paradestate">
+        <div class="modal modal-wide">
+            <h2>📋 Import from Parade State — Day <span id="paradestate-day-label">1</span></h2>
+            <p class="gen-subtitle">Paste the parade state text below. We'll detect the GC from "- COMD:", Combatants from "- ST CBT:", and Service from "- ST SVC:" and add them as personnel.</p>
+
+            <textarea id="paradestate-input" rows="14" placeholder="Paste the full parade state text here…" style="width:100%;font-family:'Courier New',monospace;font-size:12px;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;resize:vertical;"></textarea>
+
+            <div class="gen-options" style="margin-top:10px">
+                <label class="gen-check">
+                    <input type="checkbox" id="paradestate-clear" checked>
+                    Clear existing KAH/Combatants/Service before importing
+                </label>
+            </div>
+
+            <div id="paradestate-result" class="gen-result" style="display:none"></div>
+
+            <div class="modal-btns" style="margin-top:14px">
+                <button class="btn-cancel" onclick="closeModal('modal-paradestate')">Cancel</button>
+                <button class="btn-primary" style="background:#0d9488" onclick="importParadeState()">📋 Detect &amp; Import</button>
             </div>
         </div>
     </div>
