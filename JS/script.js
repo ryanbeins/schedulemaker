@@ -767,8 +767,7 @@ function footerLabel(icon, text, kind) {
   return `<span class="footer-label-badge fl-${kind}">${icon} ${text}</span>`;
 }
 
-// Each footer duty card, keyed by a stable id so a saved custom order
-// (data.meta.footerCardOrder) can be replayed regardless of build-order.
+// Each footer duty card, keyed by id and rendered in DEFAULT_FOOTER_ORDER below.
 const FOOTER_CARD_DEFS = {
   flag0600: { cls: 'card-wide', render: (c) => {
     c.innerHTML = footerLabel('🚩', '0600 (AM) Flag:', 'flag') + '<br>';
@@ -846,20 +845,13 @@ const FOOTER_CARD_DEFS = {
     makeProwlSelects(c, 'trashN', 3, { randomize: true });
   } },
 };
-const DEFAULT_FOOTER_ORDER = ['flag0600', 'flag1800', 'date', 'prowl', 'strength', 'night', 'rations', 'svc', 'trashM', 'trashN'];
-
-function footerCardOrder() {
-  const saved = data.meta.footerCardOrder;
-  return (Array.isArray(saved) && saved.length === DEFAULT_FOOTER_ORDER.length && saved.every(id => FOOTER_CARD_DEFS[id]))
-    ? saved
-    : DEFAULT_FOOTER_ORDER;
-}
+const DEFAULT_FOOTER_ORDER = ['flag0600', 'flag1800', 'prowl', 'night', 'strength', 'svc', 'rations', 'trashM', 'trashN', 'date'];
 
 // Footer duties render as a wrapping card grid (flexbox, not table colspans)
 // so each card is only ever as wide as its own content needs — a duty with
 // fewer fields can't leave a big dead gap next to it, and cards just wrap
-// onto a new line once a row runs out of room. Cards are also drag-to-reorder
-// (see startFooterCardDrag below), with the chosen order saved per day.
+// onto a new line once a row runs out of room. Order is fixed (not
+// user-reorderable).
 function renderFooter(tbody, constraintCache) {
   const divRow = tbody.insertRow();
   divRow.insertCell().colSpan = TOTAL_TABLE_COLS;
@@ -874,80 +866,14 @@ function renderFooter(tbody, constraintCache) {
   grid.className = 'footer-grid';
   gridCell.appendChild(grid);
 
-  footerCardOrder().forEach(id => {
+  DEFAULT_FOOTER_ORDER.forEach(id => {
     const def = FOOTER_CARD_DEFS[id];
     const c = document.createElement('div');
     c.className = 'footer-card' + (def.cls ? ' ' + def.cls : '');
-    c.dataset.cardId = id;
     grid.appendChild(c);
-
-    // Render first — most defs assign c.innerHTML wholesale, which would
-    // wipe out a handle appended beforehand.
     def.render(c);
-
-    const handle = document.createElement('span');
-    handle.className = 'footer-card-drag-handle';
-    handle.textContent = '⠿';
-    handle.title = 'Drag to reorder';
-    handle.addEventListener('mousedown', (e) => startFooterCardDrag(e, c));
-    handle.addEventListener('touchstart', (e) => startFooterCardDrag(e, c), { passive: false });
-    c.appendChild(handle);
   });
 }
-
-// ═══════════════════════════════════════════════
-//  FOOTER CARD DRAG-TO-REORDER
-// ═══════════════════════════════════════════════
-let footerCardDragState = null;
-
-function startFooterCardDrag(e, cardEl) {
-  e.preventDefault();
-  e.stopPropagation();
-  footerCardDragState = { cardEl, targetId: null };
-  cardEl.classList.add('dragging-card');
-  document.body.style.userSelect = 'none';
-}
-
-function footerCardDragMove(clientX, clientY) {
-  if (!footerCardDragState) return;
-  document.querySelectorAll('.footer-card.drag-over-card').forEach(c => c.classList.remove('drag-over-card'));
-  const el = document.elementFromPoint(clientX, clientY);
-  const targetCard = el && el.closest('.footer-card');
-  if (!targetCard || targetCard === footerCardDragState.cardEl) {
-    footerCardDragState.targetId = null;
-    return;
-  }
-  targetCard.classList.add('drag-over-card');
-  footerCardDragState.targetId = targetCard.dataset.cardId;
-}
-
-function endFooterCardDrag() {
-  if (!footerCardDragState) return;
-  document.querySelectorAll('.footer-card').forEach(c => c.classList.remove('dragging-card', 'drag-over-card'));
-  document.body.style.userSelect = '';
-  const { cardEl, targetId } = footerCardDragState;
-  footerCardDragState = null;
-  if (!targetId) return;
-
-  const movedId = cardEl.dataset.cardId;
-  const order = [...footerCardOrder()];
-  const fromIdx = order.indexOf(movedId);
-  const toIdx   = order.indexOf(targetId);
-  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
-  order.splice(fromIdx, 1);
-  order.splice(toIdx, 0, movedId);
-  data.meta.footerCardOrder = order;
-  render();
-}
-
-document.addEventListener('mousemove', (e) => { footerCardDragMove(e.clientX, e.clientY); });
-document.addEventListener('mouseup',   () => { endFooterCardDrag(); });
-document.addEventListener('touchmove', (e) => {
-  if (!footerCardDragState) return;
-  e.preventDefault();
-  footerCardDragMove(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
-document.addEventListener('touchend', () => { endFooterCardDrag(); });
 
 // ═══════════════════════════════════════════════
 //  TIMELINE CLICK → ADD TASK

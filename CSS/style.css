@@ -544,23 +544,6 @@ td.total-d2 { background: #fefce8; }
 .footer-card.card-wide  { flex-basis: 440px; min-width: 440px; }
 .footer-card.card-small { flex: 0 1 220px; min-width: 220px; }
 
-/* Drag-to-reorder handle + states for footer cards */
-.footer-card-drag-handle {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  font-size: 16px;
-  line-height: 1;
-  color: #94a3b8;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-.footer-card-drag-handle:hover  { color: #3b82f6; }
-.footer-card-drag-handle:active { cursor: grabbing; color: #3b82f6; }
-.footer-card.dragging-card { opacity: 0.4; }
-.footer-card.drag-over-card { box-shadow: 0 0 0 3px #3b82f6, 0 2px 8px rgba(15,23,42,0.09); }
-
 /* Duty label pills — icon + colored chip instead of plain bold text */
 .footer-label-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -1287,7 +1270,6 @@ td.total-d2 { background: #fefce8; }
   /* ── Footer: bigger rows for easy tapping, one card per line ── */
   .footer-grid { padding: 12px; gap: 10px; }
   .footer-card, .footer-card.card-wide, .footer-card.card-small { flex-basis: 100%; min-width: 100%; }
-  .footer-card-drag-handle { font-size: 22px; top: 8px; right: 10px; padding: 4px; }
   .footer-prowl-select { font-size: 15px !important; min-height: 44px; }
   .prowl-rng-btn { width: 44px; height: 44px; min-height: 44px; font-size: 18px; }
   .strength-inp { width: 52px !important; min-height: 44px !important; font-size: 17px !important; }
