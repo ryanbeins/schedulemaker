@@ -102,7 +102,7 @@ function defaultMeta(dateOffsetDays) {
   d.setDate(d.getDate() + dateOffsetDays);
   return {
     flag0600: '', flag1800: '',
-    prowl: '', nightProwl1: '', nightProwl2: '',
+    prowl: '', nightProwl1: '',
     trashM: '', trashN: '', throwRations: '',
     strength: '00 / 00 / 00', svcAvg: 0, notes: [], ignoredViolations: [],
     date: d.toISOString().slice(0, 10),
@@ -178,7 +178,7 @@ function demoDay1() {
     ],
     meta: {
       flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
-      prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
+      prowl: 'Adlan,ZZ', nightProwl1: '',
       trashM: '', trashN: '', throwRations: '',
       strength: '02 / 06 / 02', svcAvg: 4.5, notes: [], ignoredViolations: [],
       date: new Date().toISOString().slice(0, 10),
@@ -727,7 +727,21 @@ function makeProwlSelects(container, metaKey, count = 2, opts = {}) {
 
   const wrap = document.createElement('div');
   wrap.className = 'prowl-selects';
-  selects.forEach(s => wrap.appendChild(s));
+  selects.forEach((s, i) => {
+    const lbl = opts.labels && opts.labels[i];
+    if (lbl) {
+      const pair = document.createElement('span');
+      pair.className = 'labeled-select-pair';
+      const tag = document.createElement('span');
+      tag.className = 'labeled-select-tag';
+      tag.textContent = lbl;
+      pair.appendChild(tag);
+      pair.appendChild(s);
+      wrap.appendChild(pair);
+    } else {
+      wrap.appendChild(s);
+    }
+  });
 
   if (opts.randomize) {
     const rngBtn = document.createElement('button');
@@ -747,137 +761,193 @@ function makeProwlSelects(container, metaKey, count = 2, opts = {}) {
   container.appendChild(wrap);
 }
 
-function makeFooterEditable(cell, getV, setV, opts = {}) {
-  cell.classList.add('footer-editable');
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.value = getV();
-  inp.className = 'footer-editable-input';
-  if (opts.textAlign)  inp.style.textAlign = opts.textAlign;
-  if (opts.inputMode)  inp.inputMode = opts.inputMode;
-  inp.addEventListener('blur', () => { setV(inp.value.trim()); saveToStorage(); inp.value = getV(); });
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  { e.preventDefault(); inp.blur(); }
-    if (e.key === 'Escape') { inp.value = getV(); inp.blur(); }
-  });
-  cell.appendChild(inp);
+// Colored icon pill for a footer duty label, replacing plain bold text so
+// each duty type reads at a glance instead of blending into one wall of text.
+function footerLabel(icon, text, kind) {
+  return `<span class="footer-label-badge fl-${kind}">${icon} ${text}</span>`;
 }
 
+// Each footer duty card, keyed by a stable id so a saved custom order
+// (data.meta.footerCardOrder) can be replayed regardless of build-order.
+const FOOTER_CARD_DEFS = {
+  flag0600: { cls: 'card-wide', render: (c) => {
+    c.innerHTML = footerLabel('🚩', '0600 (AM) Flag:', 'flag') + '<br>';
+    makeProwlSelects(c, 'flag0600', 3, { randomize: true });
+  } },
+  flag1800: { cls: 'card-wide', render: (c) => {
+    c.innerHTML = footerLabel('🚩', '1800 (PM) Flag:', 'flag') + '<br>';
+    makeProwlSelects(c, 'flag1800', 3, { randomize: true });
+  } },
+  date: { cls: 'card-small', render: (c) => {
+    c.innerHTML = footerLabel('📅', 'Date:', 'date') + '<br>';
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.value = data.meta.date || new Date().toISOString().slice(0, 10);
+    dateInput.className = 'footer-date-input';
+    dateInput.onchange = () => { data.meta.date = dateInput.value; saveToStorage(); };
+    c.appendChild(dateInput);
+  } },
+  prowl: { cls: '', render: (c) => {
+    c.innerHTML = footerLabel('🌅', 'Morning Prowl (4am-6am):', 'prowl') + '<br>';
+    makeProwlSelects(c, 'prowl', 2, { randomize: true });
+  } },
+  strength: { cls: '', render: (c) => {
+    c.innerHTML = footerLabel('💪', 'Total Strength:', 'strength') + '<br>';
+    const strParts = (data.meta.strength || '00 / 00 / 00').split('/').map(p => p.trim());
+    const strDiv = document.createElement('div');
+    strDiv.className = 'strength-fields';
+    ['GC', 'CBT', 'SVC'].forEach((lbl, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'strength-field';
+      const label = document.createElement('span');
+      label.textContent = lbl;
+      label.className = 'strength-label';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = strParts[i] || '00';
+      inp.className = 'footer-editable-input strength-inp';
+      inp.inputMode = 'numeric';
+      inp.maxLength = 3;
+      const save = () => {
+        const vals = [...strDiv.querySelectorAll('input')].map(x => x.value.trim() || '00');
+        data.meta.strength = vals.join(' / ');
+        saveToStorage();
+      };
+      inp.addEventListener('blur', save);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+      wrap.appendChild(label);
+      wrap.appendChild(inp);
+      strDiv.appendChild(wrap);
+    });
+    c.appendChild(strDiv);
+  } },
+  night: { cls: '', render: (c) => {
+    c.innerHTML = footerLabel('🌙', 'Night Prowl (8pm-11pm):', 'night') + '<br>';
+    makeProwlSelects(c, 'nightProwl1', 2, { randomize: true });
+  } },
+  rations: { cls: '', render: (c) => {
+    c.innerHTML = footerLabel('🍚', 'Throw Rations (Once Expired):', 'rations') + '<br>';
+    makeProwlSelects(c, 'throwRations', 2, { randomize: true, labels: ['M', 'N'] });
+  } },
+  svc: { cls: '', render: (c) => {
+    const computedAvg = calcSvcAvg();
+    data.meta.svcAvg = computedAvg;
+    c.innerHTML = footerLabel('⏱️', 'Service Avg Mounting hrs:', 'svc') + '<br>' +
+      (computedAvg > 0
+        ? `<span class="svc-avg-chip">${computedAvg.toFixed(2)} hrs</span>`
+        : `<span class="svc-avg-chip svc-avg-chip-empty">—</span>`);
+  } },
+  trashM: { cls: 'card-wide', render: (c) => {
+    c.innerHTML = footerLabel('🧹', 'Morning Trash (8am-11am):', 'trash') + '<br>';
+    makeProwlSelects(c, 'trashM', 3, { randomize: true });
+  } },
+  trashN: { cls: 'card-wide', render: (c) => {
+    c.innerHTML = footerLabel('🧹', 'Night Trash (8pm-11pm):', 'trash') + '<br>';
+    makeProwlSelects(c, 'trashN', 3, { randomize: true });
+  } },
+};
+const DEFAULT_FOOTER_ORDER = ['flag0600', 'flag1800', 'date', 'prowl', 'strength', 'night', 'rations', 'svc', 'trashM', 'trashN'];
+
+function footerCardOrder() {
+  const saved = data.meta.footerCardOrder;
+  return (Array.isArray(saved) && saved.length === DEFAULT_FOOTER_ORDER.length && saved.every(id => FOOTER_CARD_DEFS[id]))
+    ? saved
+    : DEFAULT_FOOTER_ORDER;
+}
+
+// Footer duties render as a wrapping card grid (flexbox, not table colspans)
+// so each card is only ever as wide as its own content needs — a duty with
+// fewer fields can't leave a big dead gap next to it, and cards just wrap
+// onto a new line once a row runs out of room. Cards are also drag-to-reorder
+// (see startFooterCardDrag below), with the chosen order saved per day.
 function renderFooter(tbody, constraintCache) {
   const divRow = tbody.insertRow();
   divRow.insertCell().colSpan = TOTAL_TABLE_COLS;
   divRow.cells[0].className = 'footer-divider';
 
-  // === Flag row ===
-  const flagRow = tbody.insertRow();
-  flagRow.className = 'footer-row footer-flags';
-  // 0600 Flag: label cell + selects cell (same pattern as 1800 flag)
-  const fl1 = flagRow.insertCell(); fl1.colSpan = 1; fl1.innerHTML = '<b>0600 Flag:</b>'; fl1.style.textAlign = 'right';
-  const fc3 = flagRow.insertCell(); fc3.colSpan = 4;
-  makeProwlSelects(fc3, 'flag0600', 3, { randomize: true });
-  // 1800 flag: label right-aligned, selects next cell
-  const fl3 = flagRow.insertCell(); fl3.colSpan = 2;
-  fl3.innerHTML = '<b>1800 flag:</b>';
-  fl3.style.textAlign = 'right';
-  const fc5 = flagRow.insertCell(); fc5.colSpan = TOTAL_TABLE_COLS - 7; // 7 = fl1 + fc3 + fl3
-  makeProwlSelects(fc5, 'flag1800', 3, { randomize: true });
+  const gridRow = tbody.insertRow();
+  const gridCell = gridRow.insertCell();
+  gridCell.colSpan = TOTAL_TABLE_COLS;
+  gridCell.className = 'footer-grid-cell';
 
-  // === Prowl row ===
-  const prowlRow = tbody.insertRow();
-  prowlRow.className = 'footer-row';
-  const cbCell = prowlRow.insertCell();
-  cbCell.colSpan = 2;
-  cbCell.style.textAlign = 'center';
-  cbCell.style.padding = '4px 8px';
-  const dateInput = document.createElement('input');
-  dateInput.type = 'date';
-  dateInput.value = data.meta.date || new Date().toISOString().slice(0, 10);
-  dateInput.className = 'footer-date-input';
-  dateInput.onchange = () => { data.meta.date = dateInput.value; saveToStorage(); };
-  cbCell.appendChild(dateInput);
+  const grid = document.createElement('div');
+  grid.className = 'footer-grid';
+  gridCell.appendChild(grid);
 
-  const pr2 = prowlRow.insertCell(); pr2.colSpan = 3;
-  pr2.innerHTML = '<b>Morning Prowl:</b><br>';
-  makeProwlSelects(pr2, 'prowl', 2, { randomize: true });
-  const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength:</b>'; pr4.style.textAlign = 'right';
-  const pr6 = prowlRow.insertCell(); pr6.colSpan = TOTAL_TABLE_COLS - 7; // 7 = cbCell + pr2 + pr4
+  footerCardOrder().forEach(id => {
+    const def = FOOTER_CARD_DEFS[id];
+    const c = document.createElement('div');
+    c.className = 'footer-card' + (def.cls ? ' ' + def.cls : '');
+    c.dataset.cardId = id;
+    grid.appendChild(c);
 
-  const strParts = (data.meta.strength || '00 / 00 / 00').split('/').map(p => p.trim());
-  const strDiv = document.createElement('div');
-  strDiv.className = 'strength-fields';
-  ['GC', 'CBT', 'SVC'].forEach((lbl, i) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'strength-field';
-    const label = document.createElement('span');
-    label.textContent = lbl;
-    label.className = 'strength-label';
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.value = strParts[i] || '00';
-    inp.className = 'footer-editable-input strength-inp';
-    inp.inputMode = 'numeric';
-    inp.maxLength = 3;
-    const save = () => {
-      const vals = [...strDiv.querySelectorAll('input')].map(x => x.value.trim() || '00');
-      data.meta.strength = vals.join(' / ');
-      saveToStorage();
-    };
-    inp.addEventListener('blur', save);
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
-    wrap.appendChild(label);
-    wrap.appendChild(inp);
-    strDiv.appendChild(wrap);
+    // Render first — most defs assign c.innerHTML wholesale, which would
+    // wipe out a handle appended beforehand.
+    def.render(c);
+
+    const handle = document.createElement('span');
+    handle.className = 'footer-card-drag-handle';
+    handle.textContent = '⠿';
+    handle.title = 'Drag to reorder';
+    handle.addEventListener('mousedown', (e) => startFooterCardDrag(e, c));
+    handle.addEventListener('touchstart', (e) => startFooterCardDrag(e, c), { passive: false });
+    c.appendChild(handle);
   });
-  pr6.appendChild(strDiv);
-
-  function makeInlineEditable(parent, metaKey) {
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.value = data.meta[metaKey];
-    inp.className = 'footer-editable-input inline';
-    inp.addEventListener('blur', () => { data.meta[metaKey] = inp.value.trim(); saveToStorage(); });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
-    parent.appendChild(inp);
-  }
-
-  // 1st Night Prowl + 2nd Night Prowl side by side, kept together as requested
-  const nightProwlRow = tbody.insertRow();
-  nightProwlRow.className = 'footer-row';
-  nightProwlRow.insertCell().colSpan = 2;
-  const np1 = nightProwlRow.insertCell(); np1.colSpan = 5;
-  np1.innerHTML = '<b>1st Night Prowl:</b><br>';
-  makeProwlSelects(np1, 'nightProwl1', 2, { randomize: true });
-  const np2 = nightProwlRow.insertCell(); np2.colSpan = TOTAL_TABLE_COLS - 7; // 7 = leading cell + np1
-  np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
-  makeProwlSelects(np2, 'nightProwl2', 2, { randomize: true });
-
-  // Throw Rations + Service Avg side by side
-  const pairedRow1 = tbody.insertRow();
-  pairedRow1.className = 'footer-row';
-  pairedRow1.insertCell().colSpan = 2;
-  const rt1 = pairedRow1.insertCell(); rt1.colSpan = 4;
-  rt1.innerHTML = '<b>Throw Rations:</b><br>';
-  makeProwlSelects(rt1, 'throwRations', 2, { randomize: true });
-  const svc2 = pairedRow1.insertCell(); svc2.colSpan = 3;
-  svc2.innerHTML = '<b>Service Avg Mounting hrs:</b>';
-  svc2.style.cssText = 'text-align:right;vertical-align:middle;';
-  const svc3 = pairedRow1.insertCell(); svc3.colSpan = TOTAL_TABLE_COLS - 9; // 9 = leading cell + rt1 + svc2
-  const computedAvg = calcSvcAvg();
-  data.meta.svcAvg = computedAvg;
-  svc3.textContent = computedAvg > 0 ? computedAvg.toFixed(2) + ' hrs' : '—';
-  svc3.style.cssText = 'text-align:center;font-weight:700;font-size:14px;color:#1d4ed8;vertical-align:middle;';
-
-  // Trash M + Trash N side by side
-  const pairedRow2 = tbody.insertRow();
-  pairedRow2.className = 'footer-row';
-  pairedRow2.insertCell().colSpan = 2;
-  const trM = pairedRow2.insertCell(); trM.colSpan = 5;
-  trM.innerHTML = '<b>Trash M:</b><br>';
-  makeProwlSelects(trM, 'trashM', 3, { randomize: true });
-  const trN = pairedRow2.insertCell(); trN.colSpan = TOTAL_TABLE_COLS - 7; // 7 = leading cell + trM
-  trN.innerHTML = '<b>Trash N:</b><br>';
-  makeProwlSelects(trN, 'trashN', 3, { randomize: true });
 }
+
+// ═══════════════════════════════════════════════
+//  FOOTER CARD DRAG-TO-REORDER
+// ═══════════════════════════════════════════════
+let footerCardDragState = null;
+
+function startFooterCardDrag(e, cardEl) {
+  e.preventDefault();
+  e.stopPropagation();
+  footerCardDragState = { cardEl, targetId: null };
+  cardEl.classList.add('dragging-card');
+  document.body.style.userSelect = 'none';
+}
+
+function footerCardDragMove(clientX, clientY) {
+  if (!footerCardDragState) return;
+  document.querySelectorAll('.footer-card.drag-over-card').forEach(c => c.classList.remove('drag-over-card'));
+  const el = document.elementFromPoint(clientX, clientY);
+  const targetCard = el && el.closest('.footer-card');
+  if (!targetCard || targetCard === footerCardDragState.cardEl) {
+    footerCardDragState.targetId = null;
+    return;
+  }
+  targetCard.classList.add('drag-over-card');
+  footerCardDragState.targetId = targetCard.dataset.cardId;
+}
+
+function endFooterCardDrag() {
+  if (!footerCardDragState) return;
+  document.querySelectorAll('.footer-card').forEach(c => c.classList.remove('dragging-card', 'drag-over-card'));
+  document.body.style.userSelect = '';
+  const { cardEl, targetId } = footerCardDragState;
+  footerCardDragState = null;
+  if (!targetId) return;
+
+  const movedId = cardEl.dataset.cardId;
+  const order = [...footerCardOrder()];
+  const fromIdx = order.indexOf(movedId);
+  const toIdx   = order.indexOf(targetId);
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+  order.splice(fromIdx, 1);
+  order.splice(toIdx, 0, movedId);
+  data.meta.footerCardOrder = order;
+  render();
+}
+
+document.addEventListener('mousemove', (e) => { footerCardDragMove(e.clientX, e.clientY); });
+document.addEventListener('mouseup',   () => { endFooterCardDrag(); });
+document.addEventListener('touchmove', (e) => {
+  if (!footerCardDragState) return;
+  e.preventDefault();
+  footerCardDragMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+document.addEventListener('touchend', () => { endFooterCardDrag(); });
 
 // ═══════════════════════════════════════════════
 //  TIMELINE CLICK → ADD TASK
@@ -1987,7 +2057,7 @@ const STORAGE_TOKEN_KEY = 'scheduleGen_token';
 // All meta fields with safe defaults
 const META_DEFAULTS = {
   flag0600: '', flag1800: '',
-  prowl: '', nightProwl1: '', nightProwl2: '',
+  prowl: '', nightProwl1: '',
   trashM: '', trashN: '', throwRations: '',
   strength: '00 / 00 / 00', svcAvg: 0, notes: [],
   ignoredViolations: [],
