@@ -42,11 +42,20 @@ function populateTypeDropdown(group, currentType) {
   sel.innerHTML = '';
   allowed.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t; opt.textContent = t;
+    opt.value = t; opt.textContent = t === 'Custom' ? 'Custom…' : t;
     if (t === currentType) opt.selected = true;
     sel.appendChild(opt);
   });
-  if (!allowed.includes(currentType)) sel.selectedIndex = 0;
+  // Saved custom roles are available for every group, same as plain "Custom"
+  customRoles.forEach(role => {
+    const opt = document.createElement('option');
+    opt.value = 'customRole:' + role.id;
+    opt.textContent = '★ ' + role.label;
+    if (opt.value === currentType) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  const values = Array.from(sel.options).map(o => o.value);
+  if (!values.includes(currentType)) sel.selectedIndex = 0;
 }
 
 const WBGT_CLASSES = {
@@ -93,7 +102,8 @@ function defaultMeta(dateOffsetDays) {
   d.setDate(d.getDate() + dateOffsetDays);
   return {
     flag0600: '', flag1800: '',
-    prowl: '', nightProwl1: '', nightProwl2: '', trash: '',
+    prowl: '', nightProwl1: '', nightProwl2: '',
+    trashM: '', trashN: '', throwRations: '',
     strength: '00 / 00 / 00', svcAvg: 0, notes: [], ignoredViolations: [],
     date: d.toISOString().slice(0, 10),
   };
@@ -168,7 +178,8 @@ function demoDay1() {
     ],
     meta: {
       flag0600: 'Adlan,Sahil,Danish', flag1800: 'Haziq,ZZ,Aidan',
-      prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '', trash: '',
+      prowl: 'Adlan,ZZ', nightProwl1: '', nightProwl2: '',
+      trashM: '', trashN: '', throwRations: '',
       strength: '02 / 06 / 02', svcAvg: 4.5, notes: [], ignoredViolations: [],
       date: new Date().toISOString().slice(0, 10),
     },
@@ -180,6 +191,11 @@ let allDays = {
   2: blankDay(2),
   3: blankDay(3),
 };
+
+// User-defined "Custom" task types saved for reuse across days/sessions —
+// { id, label, color }. Global, not per-day: a role you save while editing
+// Day 1 should still be pickable while editing Day 2 or 3.
+let customRoles = [];
 
 let data = { day: 1 };
 
@@ -560,7 +576,7 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     bar.addEventListener('touchstart', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      initDragState(e.touches[0].clientX, person.id, task.id, timeCell, bar, false);
+      initDragState(e.touches[0].clientX, e.touches[0].clientY, person.id, task.id, timeCell, bar, null);
     }, { passive: false });
     bar.addEventListener('touchend', () => {
       if (!dragState || dragState.taskId !== task.id) return;
@@ -570,7 +586,8 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
     });
     bar.onmousemove   = (e) => {
       if (dragState) return;
-      bar.style.cursor = e.clientX > bar.getBoundingClientRect().right - 10 ? 'ew-resize' : 'grab';
+      const rect = bar.getBoundingClientRect();
+      bar.style.cursor = (e.clientX > rect.right - 10 || e.clientX < rect.left + 10) ? 'ew-resize' : 'grab';
     };
     bar.onclick = (e) => {
       e.stopPropagation();
@@ -578,14 +595,25 @@ function renderPersonRow(tbody, person, avg, constraintCache) {
       openEditTaskModal(person.id, task.id);
     };
 
+    const rhLeft = document.createElement('div');
+    rhLeft.className   = 'resize-handle resize-handle-left';
+    rhLeft.title       = 'Drag to change start time';
+    rhLeft.onmousedown = (e) => { e.stopPropagation(); startBarDrag(e, person.id, task.id, timeCell, 'left'); };
+    rhLeft.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      initDragState(e.touches[0].clientX, e.touches[0].clientY, person.id, task.id, timeCell, bar, 'left');
+    }, { passive: false });
+    bar.appendChild(rhLeft);
+
     const rh = document.createElement('div');
-    rh.className    = 'resize-handle';
-    rh.title        = 'Drag to resize';
-    rh.onmousedown  = (e) => { e.stopPropagation(); startBarDrag(e, person.id, task.id, timeCell); };
+    rh.className    = 'resize-handle resize-handle-right';
+    rh.title        = 'Drag to change end time';
+    rh.onmousedown  = (e) => { e.stopPropagation(); startBarDrag(e, person.id, task.id, timeCell, 'right'); };
     rh.addEventListener('touchstart', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      initDragState(e.touches[0].clientX, person.id, task.id, timeCell, bar, true);
+      initDragState(e.touches[0].clientX, e.touches[0].clientY, person.id, task.id, timeCell, bar, 'right');
     }, { passive: false });
     bar.appendChild(rh);
 
@@ -770,7 +798,7 @@ function renderFooter(tbody, constraintCache) {
 
   const pr2 = prowlRow.insertCell(); pr2.colSpan = 3;
   pr2.innerHTML = '<b>Morning Prowl:</b><br>';
-  makeProwlSelects(pr2, 'prowl');
+  makeProwlSelects(pr2, 'prowl', 2, { randomize: true });
   const pr4 = prowlRow.insertCell(); pr4.colSpan = 2; pr4.innerHTML = '<b>Total Strength:</b>'; pr4.style.textAlign = 'right';
   const pr6 = prowlRow.insertCell(); pr6.colSpan = TOTAL_TABLE_COLS - 7; // 7 = cbCell + pr2 + pr4
 
@@ -812,35 +840,43 @@ function renderFooter(tbody, constraintCache) {
     parent.appendChild(inp);
   }
 
-  // 1st Night Prowl + Service Avg on same row
-  const nightProwlRow1 = tbody.insertRow();
-  nightProwlRow1.className = 'footer-row';
-  nightProwlRow1.insertCell().colSpan = 2;
-  const np1 = nightProwlRow1.insertCell(); np1.colSpan = 4;
+  // 1st Night Prowl + 2nd Night Prowl side by side, kept together as requested
+  const nightProwlRow = tbody.insertRow();
+  nightProwlRow.className = 'footer-row';
+  nightProwlRow.insertCell().colSpan = 2;
+  const np1 = nightProwlRow.insertCell(); np1.colSpan = 5;
   np1.innerHTML = '<b>1st Night Prowl:</b><br>';
-  makeProwlSelects(np1, 'nightProwl1');
-  const svc2 = nightProwlRow1.insertCell(); svc2.colSpan = 3;
+  makeProwlSelects(np1, 'nightProwl1', 2, { randomize: true });
+  const np2 = nightProwlRow.insertCell(); np2.colSpan = TOTAL_TABLE_COLS - 7; // 7 = leading cell + np1
+  np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
+  makeProwlSelects(np2, 'nightProwl2', 2, { randomize: true });
+
+  // Throw Rations + Service Avg side by side
+  const pairedRow1 = tbody.insertRow();
+  pairedRow1.className = 'footer-row';
+  pairedRow1.insertCell().colSpan = 2;
+  const rt1 = pairedRow1.insertCell(); rt1.colSpan = 4;
+  rt1.innerHTML = '<b>Throw Rations:</b><br>';
+  makeProwlSelects(rt1, 'throwRations', 2, { randomize: true });
+  const svc2 = pairedRow1.insertCell(); svc2.colSpan = 3;
   svc2.innerHTML = '<b>Service Avg Mounting hrs:</b>';
   svc2.style.cssText = 'text-align:right;vertical-align:middle;';
-  const svc3 = nightProwlRow1.insertCell(); svc3.colSpan = TOTAL_TABLE_COLS - 9; // 9 = leading cell + np1 + svc2
+  const svc3 = pairedRow1.insertCell(); svc3.colSpan = TOTAL_TABLE_COLS - 9; // 9 = leading cell + rt1 + svc2
   const computedAvg = calcSvcAvg();
   data.meta.svcAvg = computedAvg;
   svc3.textContent = computedAvg > 0 ? computedAvg.toFixed(2) + ' hrs' : '—';
   svc3.style.cssText = 'text-align:center;font-weight:700;font-size:14px;color:#1d4ed8;vertical-align:middle;';
 
-  const nightProwlRow2 = tbody.insertRow();
-  nightProwlRow2.className = 'footer-row';
-  nightProwlRow2.insertCell().colSpan = 2;
-  const np2 = nightProwlRow2.insertCell(); np2.colSpan = TOTAL_TABLE_COLS - 2; // 2 = leading cell
-  np2.innerHTML = '<b>2nd Night Prowl:</b><br>';
-  makeProwlSelects(np2, 'nightProwl2');
-
-  const trashRow = tbody.insertRow();
-  trashRow.className = 'footer-row';
-  trashRow.insertCell().colSpan = 2;
-  const tr1 = trashRow.insertCell(); tr1.colSpan = TOTAL_TABLE_COLS - 2; // 2 = leading cell
-  tr1.innerHTML = '<b>Trash:</b><br>';
-  makeProwlSelects(tr1, 'trash', 3);
+  // Trash M + Trash N side by side
+  const pairedRow2 = tbody.insertRow();
+  pairedRow2.className = 'footer-row';
+  pairedRow2.insertCell().colSpan = 2;
+  const trM = pairedRow2.insertCell(); trM.colSpan = 5;
+  trM.innerHTML = '<b>Trash M:</b><br>';
+  makeProwlSelects(trM, 'trashM', 3, { randomize: true });
+  const trN = pairedRow2.insertCell(); trN.colSpan = TOTAL_TABLE_COLS - 7; // 7 = leading cell + trM
+  trN.innerHTML = '<b>Trash N:</b><br>';
+  makeProwlSelects(trN, 'trashN', 3, { randomize: true });
 }
 
 // ═══════════════════════════════════════════════
@@ -930,6 +966,16 @@ function clearGroup(groupId, label) {
   for (let i = data.personnel.length - 1; i >= 0; i--) {
     if (data.personnel[i].group === groupId) data.personnel.splice(i, 1);
   }
+  render();
+}
+
+// Same idea as clearGroup(), but across every group at once — one confirm
+// instead of clicking each group's own "Clear All" in turn.
+function clearAllPersonnel() {
+  const count = data.personnel.length;
+  if (!count) return;
+  if (!confirm(`Remove all ${count} ${count === 1 ? 'person' : 'people'} on Day ${data.day}? This cannot be undone.`)) return;
+  data.personnel.splice(0, data.personnel.length);
   render();
 }
 
@@ -1024,6 +1070,7 @@ function openAddTaskModal(personId, startTime, endTime) {
   document.getElementById('btn-delete-task').style.display = 'none';
   document.getElementById('custom-label-wrap').style.display = 'none';
   document.getElementById('t-custom-label').value = '';
+  document.getElementById('t-save-role').checked = false;
   updateTaskColor();
   openModal('modal-task');
 }
@@ -1042,16 +1089,46 @@ function openEditTaskModal(personId, taskId) {
   const isCustom = t.type === 'Custom';
   document.getElementById('custom-label-wrap').style.display = isCustom ? '' : 'none';
   document.getElementById('t-custom-label').value = isCustom ? (t.label || '') : '';
+  document.getElementById('t-save-role').checked = false;
   updateTaskColor();
   openModal('modal-task');
 }
 
 function updateTaskColor() {
-  const type     = document.getElementById('t-type').value;
-  const isCustom = type === 'Custom';
-  document.getElementById('custom-label-wrap').style.display = isCustom ? '' : 'none';
-  if (!isCustom) document.getElementById('t-color').value = taskColor(null, type);
+  const rawType   = document.getElementById('t-type').value;
+  const roleId    = rawType.startsWith('customRole:') ? rawType.slice('customRole:'.length) : null;
+  const role      = roleId ? customRoles.find(r => r.id === roleId) : null;
+  const isCustom  = rawType === 'Custom' || !!role;
+
+  document.getElementById('custom-label-wrap').style.display  = isCustom ? '' : 'none';
+  document.getElementById('t-save-role-wrap').style.display   = rawType === 'Custom' ? '' : 'none';
+  document.getElementById('t-delete-role-btn').style.display  = role ? '' : 'none';
+
+  if (role) {
+    document.getElementById('t-custom-label').value = role.label;
+    document.getElementById('t-color').value = role.color;
+  } else if (!isCustom) {
+    document.getElementById('t-color').value = taskColor(null, rawType);
+  }
   document.getElementById('color-preview').style.background = document.getElementById('t-color').value;
+}
+
+// Removes a saved role from the reusable list (doesn't touch any tasks
+// already created from it — those keep their own stored label/color).
+function deleteCustomRole() {
+  const rawType = document.getElementById('t-type').value;
+  if (!rawType.startsWith('customRole:')) return;
+  const roleId = rawType.slice('customRole:'.length);
+  const role = customRoles.find(r => r.id === roleId);
+  if (!role || !confirm(`Delete the saved role "${role.label}"?`)) return;
+
+  customRoles = customRoles.filter(r => r.id !== roleId);
+  saveToStorage();
+
+  const p = data.personnel.find(x => x.id === _editTaskPersonId);
+  populateTypeDropdown(p.group, 'Custom');
+  document.getElementById('t-custom-label').value = '';
+  updateTaskColor();
 }
 
 document.getElementById('t-color').addEventListener('input', () => {
@@ -1059,20 +1136,34 @@ document.getElementById('t-color').addEventListener('input', () => {
 });
 
 function saveTask() {
-  const type        = document.getElementById('t-type').value;
+  const rawType     = document.getElementById('t-type').value;
   const start       = document.getElementById('t-start').value.trim().padStart(4, '0');
   const end         = document.getElementById('t-end').value.trim().padStart(4, '0');
   const color       = document.getElementById('t-color').value;
   const customLabel = document.getElementById('t-custom-label').value.trim();
+  const saveAsRole  = document.getElementById('t-save-role').checked;
 
   if (!/^\d{4}$/.test(start) || !/^\d{4}$/.test(end)) {
     alert('Enter valid 4-digit times (HHMM)'); return;
   }
   const p = data.personnel.find(x => x.id === _editTaskPersonId);
+
+  // A picked saved role, or the free-text "Custom…" entry, both persist as
+  // type:'Custom' under the hood — only the label/color differ.
+  const roleId = rawType.startsWith('customRole:') ? rawType.slice('customRole:'.length) : null;
+  const role   = roleId ? customRoles.find(r => r.id === roleId) : null;
+  const type   = role ? 'Custom' : rawType;
+
   if (!allowedTypes(p.group).includes(type)) {
     alert(`${type} is not allowed for ${p.group} personnel.`); return;
   }
-  const label = type === 'Custom' ? (customLabel || type) : `${type} ${start}-${end}`;
+
+  const label = type === 'Custom' ? (role ? role.label : (customLabel || type)) : `${type} ${start}-${end}`;
+
+  if (type === 'Custom' && !role && saveAsRole && customLabel) {
+    const exists = customRoles.some(r => r.label.toLowerCase() === customLabel.toLowerCase());
+    if (!exists) customRoles.push({ id: uid(), label: customLabel, color });
+  }
 
   if (_editTaskId) {
     const t = p.tasks.find(x => x.id === _editTaskId);
@@ -1151,12 +1242,33 @@ function updateDayTabsUI() {
   });
 }
 
-// Wipe all assigned tasks for the active day only, so its personnel/WBGT
-// setup stays put but the schedule itself starts blank again.
-function clearDay() {
-  if (!confirm(`Clear all tasks for Day ${data.day}? This cannot be undone.`)) return;
-  data.personnel.forEach(p => { p.tasks = []; });
-  data.meta.ignoredViolations = [];
+// Wipe all assigned tasks for the active day (or just one group within it),
+// so personnel/WBGT setup stays put but the schedule itself starts blank
+// again. Never removes people — that's what each group's own "Clear All" does.
+const CLEAR_SCOPE_LABELS = {
+  kah: 'Key Appointment Holders',
+  combatants: 'Combatants',
+  service: 'Service',
+  night: 'Night Duty',
+};
+
+function openClearScheduleModal() {
+  document.getElementById('clear-day-label').textContent = data.day;
+  openModal('modal-clear');
+}
+
+function clearScheduleFor(scope) {
+  const label     = scope === 'day' ? `Day ${data.day}` : CLEAR_SCOPE_LABELS[scope];
+  const target    = scope === 'day' ? data.personnel : data.personnel.filter(p => p.group === scope);
+  const taskCount = target.reduce((sum, p) => sum + p.tasks.length, 0);
+
+  if (!taskCount) { closeModal('modal-clear'); return; }
+  if (!confirm(`Clear all tasks for ${label}? This cannot be undone.`)) return;
+
+  target.forEach(p => { p.tasks = []; });
+  if (scope === 'day') data.meta.ignoredViolations = [];
+
+  closeModal('modal-clear');
   render();
 }
 
@@ -1666,28 +1778,47 @@ let dragState    = null;
 let lastDragMoved = false;
 const SNAP_MINS  = 30;
 
-function initDragState(clientX, personId, taskId, timelineCell, bar, isResize) {
+function initDragState(clientX, clientY, personId, taskId, timelineCell, bar, edge) {
   dragState = {
-    type: isResize ? 'resize' : 'move',
+    type: edge ? 'resize' : 'move',
+    edge, // null (move), 'left' (start time), or 'right' (end time)
     bar, personId, taskId, timelineCell,
     startMouseX: clientX,
+    startMouseY: clientY,
+    hoverPersonId: personId, // which row the bar would drop onto right now
     origLeft:  parseFloat(bar.style.left),
     origWidth: parseFloat(bar.style.width),
     moved: false,
   };
   bar.classList.add('dragging');
-  document.body.style.cursor = isResize ? 'ew-resize' : 'grabbing';
+  document.body.style.cursor = edge ? 'ew-resize' : 'grabbing';
 }
 
-function startBarDrag(e, personId, taskId, timelineCell) {
+function startBarDrag(e, personId, taskId, timelineCell, forceEdge) {
   if (e.button !== 0) return;
   e.preventDefault();
   e.stopPropagation();
 
   const isHandle = e.currentTarget.classList.contains('resize-handle');
   const bar      = isHandle ? e.currentTarget.parentElement : e.currentTarget;
-  const isResize = isHandle || e.clientX > bar.getBoundingClientRect().right - 10;
-  initDragState(e.clientX, personId, taskId, timelineCell, bar, isResize);
+  let edge = forceEdge || null;
+  if (!edge && !isHandle) {
+    const rect = bar.getBoundingClientRect();
+    if (e.clientX > rect.right - 10) edge = 'right';
+    else if (e.clientX < rect.left + 10) edge = 'left';
+  }
+  initDragState(e.clientX, e.clientY, personId, taskId, timelineCell, bar, edge);
+}
+
+// While dragging the whole bar (not resizing an edge), find which person's
+// row the pointer is currently over so the drop can reassign the task there.
+function updateHoverRow(clientX, clientY) {
+  document.querySelectorAll('.person-row.task-drop-target').forEach(r => r.classList.remove('task-drop-target'));
+  const rowEl = document.elementFromPoint(clientX, clientY)?.closest('.person-row');
+  dragState.hoverPersonId = rowEl ? rowEl.dataset.personId : dragState.personId;
+  if (rowEl && rowEl.dataset.personId !== dragState.personId) {
+    rowEl.classList.add('task-drop-target');
+  }
 }
 
 function handleDragMove(clientX, clientY) {
@@ -1695,21 +1826,32 @@ function handleDragMove(clientX, clientY) {
 
   const cellW  = dragState.timelineCell.getBoundingClientRect().width;
   const dxPx   = clientX - dragState.startMouseX;
+  const dyPx   = clientY - dragState.startMouseY;
   const dxPct  = (dxPx / cellW) * 100;
 
-  if (Math.abs(dxPx) > 5) dragState.moved = true;
+  if (Math.abs(dxPx) > 5 || Math.abs(dyPx) > 5) dragState.moved = true;
   if (!dragState.moved) return;
 
   if (dragState.type === 'move') {
+    updateHoverRow(clientX, clientY);
     const rawMins = visualPctToMins(dragState.origLeft + dxPct);
     const snappedMins = Math.max(0, Math.min(TOTAL_MINS, Math.round(rawMins / SNAP_MINS) * SNAP_MINS));
     dragState.bar.style.left = minsToVisualPct(snappedMins) + '%';
-  } else {
+  } else if (dragState.edge === 'right') {
     const rawRightMins = visualPctToMins(dragState.origLeft + dragState.origWidth + dxPct);
     const snappedRight = Math.round(rawRightMins / SNAP_MINS) * SNAP_MINS;
     const origLeftMins = visualPctToMins(dragState.origLeft);
     const clampedRight = Math.max(origLeftMins + SNAP_MINS, Math.min(TOTAL_MINS, snappedRight));
     dragState.bar.style.width = (minsToVisualPct(clampedRight) - dragState.origLeft) + '%';
+  } else {
+    // edge === 'left': drag the start time, keeping the end time fixed
+    const origRightMins = visualPctToMins(dragState.origLeft + dragState.origWidth);
+    const rawLeftMins   = visualPctToMins(dragState.origLeft + dxPct);
+    const snappedLeft   = Math.round(rawLeftMins / SNAP_MINS) * SNAP_MINS;
+    const clampedLeft   = Math.max(0, Math.min(origRightMins - SNAP_MINS, snappedLeft));
+    const newLeftPct    = minsToVisualPct(clampedLeft);
+    dragState.bar.style.left  = newLeftPct + '%';
+    dragState.bar.style.width = (minsToVisualPct(origRightMins) - newLeftPct) + '%';
   }
 
   const left  = parseFloat(dragState.bar.style.left);
@@ -1730,10 +1872,11 @@ function handleDragMove(clientX, clientY) {
 function handleDragEnd() {
   if (!dragState) return;
 
-  const { bar, personId, taskId, moved } = dragState;
+  const { bar, personId, taskId, moved, type, hoverPersonId } = dragState;
   bar.classList.remove('dragging');
   document.body.style.cursor = '';
   document.getElementById('drag-tooltip').style.display = 'none';
+  document.querySelectorAll('.person-row.task-drop-target').forEach(r => r.classList.remove('task-drop-target'));
 
   if (moved) {
     lastDragMoved = true;
@@ -1745,6 +1888,15 @@ function handleDragEnd() {
     const t = p.tasks.find(x => x.id === taskId);
     t.start = newStart; t.end = newEnd;
     if (t.type !== 'Custom') t.label = `${t.type} ${newStart}-${newEnd}`;
+
+    // Dropped on a different person's row — hand the task off to them.
+    if (type === 'move' && hoverPersonId && hoverPersonId !== personId) {
+      const target = data.personnel.find(x => x.id === hoverPersonId);
+      if (target) {
+        p.tasks = p.tasks.filter(x => x.id !== taskId);
+        target.tasks.push(t);
+      }
+    }
     render();
   }
 
@@ -1835,7 +1987,8 @@ const STORAGE_TOKEN_KEY = 'scheduleGen_token';
 // All meta fields with safe defaults
 const META_DEFAULTS = {
   flag0600: '', flag1800: '',
-  prowl: '', nightProwl1: '', nightProwl2: '', trash: '',
+  prowl: '', nightProwl1: '', nightProwl2: '',
+  trashM: '', trashN: '', throwRations: '',
   strength: '00 / 00 / 00', svcAvg: 0, notes: [],
   ignoredViolations: [],
   date: new Date().toISOString().slice(0, 10),
@@ -1863,11 +2016,12 @@ function applyParsed(parsed) {
     mergeDayEntry(allDays[1], d);
     applyDayPointers(1);
   }
+  if (Array.isArray(parsed.customRoles)) customRoles = parsed.customRoles;
 }
 
 function saveToStorage() {
   try {
-    const token = encodeToken({ allDays, day: data.day });
+    const token = encodeToken({ allDays, day: data.day, customRoles });
     localStorage.setItem(STORAGE_TOKEN_KEY, token);
     flashSaveIndicator();
   } catch (e) {
@@ -1977,7 +2131,7 @@ async function captureScreenshot(btn) {
 
   try {
     const canvas = await html2canvas(area, {
-      scale: 1.8,
+      scale: 3,
       useCORS: true,
       logging: false,
       backgroundColor: '#e8edf4',
@@ -2035,7 +2189,7 @@ function loadFromURL() {
 // or shared server required, works fully offline.
 function exportToFile() {
   try {
-    const payload = { allDays, day: data.day };
+    const payload = { allDays, day: data.day, customRoles };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -2050,13 +2204,35 @@ function exportToFile() {
   }
 }
 
+// Unlike applyParsed() (used for the localStorage/URL-hash token, which is a
+// full 3-day snapshot of THIS browser's own state), a file import is treated
+// as "load the day that was exported into whichever day tab I'm on right
+// now" — so exporting Day 1 and importing while viewing Day 2 lands the
+// schedule on Day 2 instead of forcing you back to Day 1.
+function applyImportedFile(parsed) {
+  if (!parsed) return;
+  const src = parsed.allDays ? (parsed.allDays[parsed.day] || parsed.allDays[1]) : (parsed.data || parsed);
+  mergeDayEntry(allDays[data.day], src);
+  applyDayPointers(data.day);
+
+  // Add any roles from the file we don't already have — merge, don't
+  // replace, so importing a teammate's file never wipes out your own saved roles.
+  if (Array.isArray(parsed.customRoles)) {
+    parsed.customRoles.forEach(role => {
+      if (!customRoles.some(r => r.label.toLowerCase() === role.label.toLowerCase())) {
+        customRoles.push({ id: uid(), label: role.label, color: role.color });
+      }
+    });
+  }
+}
+
 function importFromFile(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      applyParsed(JSON.parse(reader.result));
+      applyImportedFile(JSON.parse(reader.result));
       saveToStorage();
       updateDayTabsUI();
       render();

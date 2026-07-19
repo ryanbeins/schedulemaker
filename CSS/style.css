@@ -357,7 +357,7 @@ body {
   background: #f8fafc;
   color: #334155;
   border-left: 3px solid transparent !important;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.12s ease-out;
 }
 .person-row td.name-cell:hover {
   background: #e0eeff;
@@ -395,6 +395,10 @@ body {
 .person-row.drag-over-top    td { box-shadow: inset 0 3px 0 0 #3b82f6; }
 .person-row.drag-over-bottom td { box-shadow: inset 0 -3px 0 0 #3b82f6; }
 
+/* Highlight the row a dragged task-bar would land on if dropped now */
+.person-row td { transition: box-shadow 0.12s ease-out; }
+.person-row.task-drop-target td { box-shadow: inset 0 0 0 3px #3b82f6; }
+
 /* ═══════════════════════════════════════════
    TIMELINE CELL — NIGHT / DAY GRADIENT
    Night:  2000–0800 = 0% to 50%
@@ -430,10 +434,14 @@ td.timeline-cell {
   box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.3);
 }
 .task-bar.dragging {
-  opacity: 0.85;
+  opacity: 0.9;
   box-shadow: 0 8px 24px rgba(0,0,0,0.45);
   z-index: 20;
   cursor: grabbing;
+  transform: scale(1.03);
+  /* Snapping updates left/width/top in discrete jumps as the pointer moves —
+     easing those instead of teleporting is what makes the drag read as smooth. */
+  transition: left 0.09s ease-out, width 0.09s ease-out, top 0.12s ease-out, transform 0.1s ease-out, box-shadow 0.15s, filter 0.15s;
 }
 .bar-type {
   font-size: 13px;
@@ -450,15 +458,17 @@ td.timeline-cell {
   max-width: 100%; text-align: center; line-height: 1.2;
 }
 
-/* Resize grip */
+/* Resize grips — one at each end of the bar, drag either to change that end's time */
 .resize-handle {
-  position: absolute; right: 0; top: 0; width: 7px; height: 100%;
+  position: absolute; top: 0; width: 7px; height: 100%;
   cursor: ew-resize;
   background: rgba(0,0,0,0.1);
-  border-radius: 0 6px 6px 0;
   transition: background 0.15s;
+  z-index: 1;
 }
 .resize-handle:hover { background: rgba(0,0,0,0.25); }
+.resize-handle-right { right: 0; border-radius: 0 6px 6px 0; }
+.resize-handle-left  { left: 0;  border-radius: 6px 0 0 6px; }
 
 /* Drag tooltip */
 #drag-tooltip {
@@ -703,6 +713,16 @@ td.total-d2 { background: #fefce8; }
 .btn-cancel  { background: #e2e8f0; color: #475569; }
 .form-row { display: flex; gap: 10px; }
 .form-row > * { flex: 1; }
+
+/* Clear Schedule Planning — vertical list of scope buttons */
+.clear-scope-list { display: flex; flex-direction: column; gap: 8px; }
+.clear-scope-list button {
+  width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+  cursor: pointer; font-size: 13px; font-weight: 600; text-align: left;
+  transition: filter 0.15s, transform 0.1s;
+}
+.clear-scope-list button:hover  { filter: brightness(1.06); transform: translateY(-1px); }
+.clear-scope-list button:active { transform: translateY(0); }
 
 /* ═══════════════════════════════════════════
    GENERATOR MODAL
@@ -1128,6 +1148,7 @@ td.total-d2 { background: #fefce8; }
   .modal-btns button {
     padding: 14px 16px; font-size: 14px; min-height: 52px; flex: 1;
   }
+  .clear-scope-list button { padding: 14px 16px; font-size: 15px; min-height: 52px; }
   .footer-editable-input { font-size: 16px !important; min-height: 52px; padding: 14px; }
   .footer-editable-input.inline { min-height: 44px; min-width: 140px; font-size: 16px !important; }
   .gen-table-wrap { -webkit-overflow-scrolling: touch; }
@@ -1149,6 +1170,9 @@ td.total-d2 { background: #fefce8; }
   /* ── Bigger task-bar text on mobile ── */
   .bar-type { font-size: 12px !important; }
   .bar-time { font-size: 10px !important; }
+
+  /* ── Wider resize grips for easier touch dragging ── */
+  .resize-handle { width: 14px; }
 
   /* ── Name column wider for readability ── */
   .person-row td.name-cell {

@@ -41,7 +41,8 @@
             <button class="tb-btn orange" onclick="document.getElementById('import-file-input').click()">⬆ Import</button>
             <input type="file" id="import-file-input" accept="application/json,.json" style="display:none" onchange="importFromFile(this)">
             <button class="tb-btn indigo" onclick="captureScreenshot(this)">📸 Screenshot</button>
-            <button class="tb-btn red" onclick="clearDay()">🗑 Clear Day</button>
+            <button class="tb-btn red" onclick="openClearScheduleModal()">🗑 Clear Schedule Planning</button>
+            <button class="tb-btn red" onclick="clearAllPersonnel()">🗑 Clear All Personnel</button>
         </div>
         <span class="tb-sep tb-hint"></span>
         <span id="save-indicator"></span>
@@ -121,7 +122,14 @@
             </select>
             <div id="custom-label-wrap" style="display:none">
                 <label>Custom Label</label>
-                <input type="text" id="t-custom-label" placeholder="e.g. REST">
+                <div style="display:flex;gap:6px">
+                    <input type="text" id="t-custom-label" placeholder="e.g. REST" style="flex:1;margin-bottom:0">
+                    <button type="button" id="t-delete-role-btn" class="btn-cancel" title="Delete this saved role"
+                        onclick="deleteCustomRole()" style="display:none;padding:6px 10px;margin-bottom:0">🗑</button>
+                </div>
+                <label id="t-save-role-wrap" class="gen-check" style="display:none;margin:8px 0 12px">
+                    <input type="checkbox" id="t-save-role"> Save as a reusable role for next time
+                </label>
             </div>
             <div class="form-row">
                 <div>
@@ -249,6 +257,26 @@
             <div class="modal-btns" style="justify-content:center;gap:12px">
                 <button id="ignore-no-btn" class="btn-cancel" style="flex:1">No</button>
                 <button id="ignore-yes-btn" class="btn-danger" style="flex:1">Yes, Ignore</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Schedule Planning Modal -->
+    <div class="modal-overlay" id="modal-clear">
+        <div class="modal" style="max-width:380px">
+            <h2>🗑 Clear Schedule Planning</h2>
+            <p style="font-size:12px;color:#64748b;margin:-6px 0 14px;line-height:1.5">
+                Choose what to clear for Day <span id="clear-day-label">1</span>. This only removes assigned tasks — personnel stay put.
+            </p>
+            <div class="clear-scope-list">
+                <button class="btn-danger" onclick="clearScheduleFor('day')">Clear Day</button>
+                <button class="btn-cancel" onclick="clearScheduleFor('kah')">Clear Key Appointment Holders</button>
+                <button class="btn-cancel" onclick="clearScheduleFor('combatants')">Clear Combatants</button>
+                <button class="btn-cancel" onclick="clearScheduleFor('service')">Clear Service</button>
+                <button class="btn-cancel" onclick="clearScheduleFor('night')">Clear Night Duty</button>
+            </div>
+            <div class="modal-btns" style="margin-top:12px">
+                <button class="btn-cancel" onclick="closeModal('modal-clear')">Cancel</button>
             </div>
         </div>
     </div>
