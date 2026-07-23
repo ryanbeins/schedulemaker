@@ -1,4 +1,4 @@
-const CACHE = 'schedulemaker-v42';
+const CACHE = 'schedulemaker-v43';
 const ASSETS = ['./home.html', './CSS/style.css', './JS/script.js', './JS/html2canvas.min.js', './manifest.json'];
 
 self.addEventListener('install', e => {
